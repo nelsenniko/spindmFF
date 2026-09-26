@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spin Diamond FF</title>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  overflow-x: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.container { width: 100%; max-width: 440px; text-align: center; }
+
+/* ============================================================
+   WATERMARK
+   ============================================================ */
+#watermarkLayer {
+  position: fixed; inset: 0; pointer-events: none; z-index: 900;
+  opacity: 0.08; overflow: hidden; font-size: 14px; color: #fff;
+  font-weight: 700; line-height: 80px; white-space: nowrap;
+  transform: rotate(-30deg) scale(1.5); transform-origin: center;
+}
+#watermarkLayer span { display: inline-block; padding: 0 40px; }
+
+#mainWatermark {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) rotate(-25deg);
+  font-size: 38px; font-weight: 900;
+  color: rgba(255, 215, 0, 0.06);
+  pointer-events: none; z-index: 899;
+  white-space: nowrap; letter-spacing: 4px; text-transform: uppercase;
+  text-shadow: 0 0 30px rgba(255,215,0,0.1);
+}
+
+/* ============================================================
+   OVERLAY BLOKIR
+   ============================================================ */
+#blockerOverlay {
+  display: none; position: fixed; inset: 0; background: #000;
+  z-index: 10000; justify-content: center; align-items: center;
+  flex-direction: column; text-align: center; padding: 30px;
+}
+#blockerOverlay.show { display: flex; }
+#blockerOverlay .icon { font-size: 80px; margin-bottom: 20px; }
+#blockerOverlay h2 { font-size: 24px; color: #ff5252; margin-bottom: 10px; }
+#blockerOverlay p { color: #a0a0b8; font-size: 14px; line-height: 1.6; }
+
+#spinLock {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.9); backdrop-filter: blur(20px);
+  z-index: 1500; justify-content: center; align-items: center;
+  flex-direction: column; text-align: center;
+}
+#spinLock.show { display: flex; }
+#spinLock .lock-icon { font-size: 80px; animation: pulse 1.5s infinite; margin-bottom: 20px; }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+}
+#spinLock h3 { font-size: 22px; color: #ffd700; letter-spacing: 2px; margin-bottom: 8px; }
+#spinLock p { color: #a0a0b8; font-size: 14px; }
+
+#screenshotWarn {
+  display: none; position: fixed; top: 20px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,23,68,0.95); color: #fff;
+  padding: 10px 20px; border-radius: 8px; font-size: 13px;
+  font-weight: 700; z-index: 5000;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+}
+#screenshotWarn.show { display: block; }
+
+/* ============================================================
+   JUDUL (AREA TAHAN 30 DETIK)
+   ============================================================ */
+h1#secretTap {
+  font-size: 26px; margin-bottom: 6px;
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7, #f107a3);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; font-weight: 800; letter-spacing: 1px;
+  transition: transform 0.2s;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  display: inline-block;
+  padding: 4px 8px;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+h1#secretTap:active { transform: scale(0.96); }
+
+.subtitle { color: #a0a0b8; font-size: 14px; margin-bottom: 18px; }
+
+/* ============================================================
+   IMPORT VOUCHER
+   ============================================================ */
+.import-box {
+  background: rgba(255,215,0,0.08);
+  border: 2px dashed rgba(255,215,0,0.4);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+.import-box .imp-title {
+  font-size: 12px; color: #ffd700; letter-spacing: 2px;
+  margin-bottom: 8px; font-weight: 700;
+}
+.import-box .imp-info {
+  font-size: 11px; color: #a0a0b8; margin-bottom: 10px; line-height: 1.4;
+}
+.import-btn {
+  padding: 10px 20px; background: linear-gradient(135deg, #ffd700, #ff9500);
+  color: #000; border: none; border-radius: 8px; font-weight: 800;
+  font-size: 13px; cursor: pointer; transition: 0.3s;
+}
+.import-btn:hover { transform: translateY(-2px); }
+
+#voucherFileInput { display: none; }
+
+.voucher-count-badge {
+  display: inline-block; padding: 3px 10px;
+  background: rgba(0,184,148,0.2); border: 1px solid #00b894;
+  color: #00b894; border-radius: 20px;
+  font-size: 11px; font-weight: 700; margin-top: 8px;
+}
+
+/* ============================================================
+   VOUCHER INPUT
+   ============================================================ */
+.voucher-box {
+  background: rgba(255,255,255,0.05);
+  border: 2px solid rgba(0, 212, 255, 0.4);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+.voucher-label {
+  font-size: 12px; color: #00d4ff; letter-spacing: 2px;
+  margin-bottom: 8px; font-weight: 700;
+}
+.voucher-input-wrap { display: flex; gap: 8px; }
+
+#voucherInput {
+  flex: 1; padding: 12px 14px; background: #0d1117;
+  border: 2px solid #30363d; border-radius: 8px; color: #fff;
+  font-size: 15px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; font-family: 'Courier New', monospace;
+  outline: none; transition: border-color 0.3s;
+}
+#voucherInput:focus { border-color: #00d4ff; }
+#voucherInput.ok  { border-color: #00b894; }
+#voucherInput.err { border-color: #ff1744; }
+
+#checkBtn {
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #00d4ff, #7b2ff7);
+  color: #fff; border: none; border-radius: 8px;
+  font-weight: 800; cursor: pointer; font-size: 14px;
+  transition: 0.3s;
+}
+#checkBtn:hover { transform: translateY(-2px); }
+
+.voucher-status {
+  font-size: 13px; margin-top: 8px;
+  min-height: 18px; font-weight: 600;
+}
+.voucher-status.ok  { color: #00b894; }
+.voucher-status.err { color: #ff5252; }
+
+/* ============================================================
+   RODA
+   ============================================================ */
+.wheel-area {
+  position: relative; width: 310px; height: 310px; margin: auto;
+  opacity: 0.4; transition: opacity 0.5s;
+}
+.wheel-area.active { opacity: 1; }
+
+.pointer {
+  position: absolute; top: -10px; left: 50%;
+  transform: translateX(-50%); width: 0; height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-top: 34px solid #ff1744;
+  z-index: 20; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+}
+.pointer::after {
+  content: ''; position: absolute; top: -34px; left: -10px;
+  width: 20px; height: 20px;
+  background: radial-gradient(circle at 30% 30%, #ff5252, #b71c1c);
+  border-radius: 50%; box-shadow: 0 0 10px rgba(255,23,68,0.8);
+}
+
+.wheel {
+  position: relative; width: 300px; height: 300px; margin: auto;
+  border: 5px solid #ffd700; border-radius: 50%;
+  box-shadow:
+    0 0 25px rgba(255, 215, 0, 0.5),
+    0 0 60px rgba(123, 47, 247, 0.4),
+    inset 0 0 20px rgba(0,0,0,0.3);
+  background: conic-gradient(
+    #ff6b6b 0deg 45deg, #4ecdc4 45deg 90deg, #ffd93d 90deg 135deg,
+    #6c5ce7 135deg 180deg, #ff9f43 180deg 225deg, #00b894 225deg 270deg,
+    #e84393 270deg 315deg, #0984e3 315deg 360deg
+  );
+  transition: transform 4.5s cubic-bezier(.17,.67,.12,.99);
+}
+
+.prize {
+  position: absolute; top: 50%; left: 50%;
+  width: 70px; height: 60px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 800; color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.7); z-index: 5;
+}
+
+.center {
+  position: absolute; width: 78px; height: 78px;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  border-radius: 50%; background: radial-gradient(circle at 30% 30%, #333, #000);
+  color: #ffd700; display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 18px; border: 3px solid #ffd700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.7), inset 0 0 10px rgba(255, 215, 0, 0.3);
+  z-index: 10; letter-spacing: 1px;
+}
+
+/* ============================================================
+   TOMBOL SPIN
+   ============================================================ */
+button#spinButton {
+  width: 100%; margin-top: 22px; padding: 16px;
+  background: linear-gradient(135deg, #7b2ff7, #f107a3);
+  color: #fff; border: none; border-radius: 12px;
+  font-size: 17px; font-weight: 800; cursor: pointer;
+  letter-spacing: 1px;
+  box-shadow: 0 6px 20px rgba(123, 47, 247, 0.5);
+  transition: all 0.3s ease;
+}
+button#spinButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(241, 7, 163, 0.6);
+}
+button#spinButton:disabled {
+  background: #555; cursor: not-allowed;
+  box-shadow: none; transform: none;
+}
+
+/* ============================================================
+   HASIL & RIWAYAT
+   ============================================================ */
+.result {
+  margin-top: 18px; padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 215, 0, 0.4);
+  border-radius: 12px; min-height: 80px;
+  backdrop-filter: blur(10px);
+}
+.result-title {
+  color: #a0a0b8; font-size: 12px;
+  margin-bottom: 6px; letter-spacing: 2px;
+}
+.result-value {
+  font-size: 30px; font-weight: 900;
+  background: linear-gradient(90deg, #00d4ff, #ffd700);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.history-toggle {
+  margin-top: 18px; width: 100%; padding: 12px;
+  background: rgba(255,255,255,0.08); color: #00d4ff;
+  border: 2px solid rgba(0,212,255,0.3); border-radius: 10px;
+  font-weight: 700; cursor: pointer; font-size: 14px;
+  transition: 0.3s;
+}
+.history-toggle:hover { background: rgba(0,212,255,0.15); }
+
+.history-panel {
+  display: none; margin-top: 12px; padding: 14px;
+  background: rgba(0,0,0,0.4); border: 2px solid rgba(0,212,255,0.3);
+  border-radius: 10px; text-align: left;
+  max-height: 240px; overflow-y: auto;
+}
+.history-panel.open { display: block; }
+.history-title {
+  font-size: 12px; color: #00d4ff; letter-spacing: 2px;
+  margin-bottom: 10px; font-weight: 700;
+}
+.history-item {
+  padding: 8px 10px; background: rgba(255,255,255,0.05);
+  border-left: 3px solid #ffd700; border-radius: 6px;
+  margin-bottom: 6px; font-size: 12px; line-height: 1.5;
+}
+.history-empty {
+  color: #666; font-size: 13px;
+  text-align: center; padding: 20px;
+}
+
+/* ============================================================
+   MODAL ADMIN
+   ============================================================ */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(6px);
+  z-index: 1000; justify-content: center; align-items: flex-start;
+  padding: 20px; overflow-y: auto;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  width: 100%; max-width: 900px;
+  background: #0d1117; border: 2px solid rgba(255,215,0,0.5);
+  border-radius: 14px; padding: 22px; margin: auto;
+  box-shadow: 0 0 40px rgba(255,215,0,0.2);
+}
+
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 18px; padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,215,0,0.3);
+}
+.modal-header h2 {
+  font-size: 20px; color: #ffd700; letter-spacing: 1px;
+}
+
+.close-btn {
+  background: transparent; border: 1px solid #ff1744;
+  color: #ff5252; width: 32px; height: 32px;
+  border-radius: 6px; font-size: 16px; font-weight: 900; cursor: pointer;
+}
+
+.admin-login { max-width: 340px; margin: 40px auto; }
+.admin-login label {
+  display: block; font-size: 13px; color: #a0a0b8;
+  margin-bottom: 6px; text-align: left;
+}
+.admin-login input {
+  width: 100%; padding: 12px 14px; background: #161b22;
+  border: 2px solid #30363d; border-radius: 8px; color: #fff;
+  font-size: 15px; outline: none; margin-bottom: 14px;
+}
+.admin-login input:focus { border-color: #ffd700; }
+.admin-login button {
+  width: 100%; padding: 12px;
+  background: linear-gradient(135deg, #ffd700, #ff9500);
+  color: #000; border: none; border-radius: 8px;
+  font-weight: 800; font-size: 15px; cursor: pointer;
+}
+.login-err {
+  color: #ff5252; font-size: 13px;
+  margin-top: 8px; min-height: 18px;
+}
+
+.admin-tabs {
+  display: flex; gap: 6px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.admin-tab {
+  padding: 8px 14px; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15); color: #a0a0b8;
+  border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.admin-tab.active {
+  background: rgba(255,215,0,0.2);
+  border-color: #ffd700; color: #ffd700;
+}
+
+.admin-tab-content { display: none; }
+.admin-tab-content.active { display: block; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px; margin-bottom: 18px;
+}
+.stat-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 10px; padding: 14px; text-align: center;
+}
+.stat-value {
+  font-size: 26px; font-weight: 900;
+  color: #ffd700; margin-bottom: 4px;
+}
+.stat-label {
+  font-size: 11px; color: #a0a0b8;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+
+.gen-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin-bottom: 14px;
+}
+.gen-form .field label {
+  display: block; font-size: 11px; color: #a0a0b8;
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;
+}
+.gen-form .field input {
+  width: 100%; padding: 8px 10px; background: #161b22;
+  border: 1px solid #30363d; border-radius: 6px;
+  color: #fff; font-size: 14px; outline: none;
+}
+.gen-form .field input:focus { border-color: #00d4ff; }
+
+.gen-btn {
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #00b894, #00d4ff);
+  color: #fff; border: none; border-radius: 8px;
+  font-weight: 800; font-size: 14px; cursor: pointer;
+  margin-right: 8px; margin-bottom: 8px;
+}
+.gen-btn:hover { transform: translateY(-2px); }
+.gen-btn.warn { background: linear-gradient(135deg, #ff6b6b, #ff1744); }
+.gen-btn.gold { background: linear-gradient(135deg, #ffd700, #ff9500); color: #000; }
+
+.table-wrap {
+  overflow-x: auto; max-height: 400px; overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+}
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  background: rgba(255,215,0,0.1); color: #ffd700;
+  padding: 10px 8px; text-align: left; font-size: 11px;
+  letter-spacing: 1px; text-transform: uppercase;
+  position: sticky; top: 0; z-index: 5;
+}
+td { padding: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
+tr:hover td { background: rgba(255,255,255,0.03); }
+
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.badge.active    { background: rgba(0,184,148,0.2); color: #00b894; border: 1px solid #00b894; }
+.badge.used      { background: rgba(160,160,184,0.2); color: #a0a0b8; border: 1px solid #a0a0b8; }
+.badge.expired   { background: rgba(255,23,68,0.2); color: #ff5252; border: 1px solid #ff5252; }
+.badge.common    { background: rgba(200,200,200,0.15); color: #ccc; }
+.badge.uncommon  { background: rgba(78,205,196,0.15); color: #4ecdc4; }
+.badge.rare      { background: rgba(255,217,61,0.15); color: #ffd93d; }
+.badge.epic      { background: rgba(108,92,231,0.2); color: #a29bfe; }
+.badge.legendary { background: rgba(232,67,147,0.2); color: #fd79a8; }
+.badge.jackpot   { background: rgba(255,215,0,0.25); color: #ffd700; }
+
+.io-box {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 16px; margin-bottom: 12px;
+}
+.io-box h3 {
+  font-size: 14px; color: #ffd700;
+  margin-bottom: 8px; letter-spacing: 1px;
+}
+.io-box p {
+  font-size: 12px; color: #a0a0b8;
+  margin-bottom: 10px; line-height: 1.5;
+}
+.io-btn {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #7b2ff7, #f107a3);
+  color: #fff; border: none; border-radius: 8px;
+  font-weight: 800; font-size: 13px; cursor: pointer;
+  margin-right: 8px; margin-bottom: 8px;
+}
+.io-btn:hover { transform: translateY(-2px); }
+.io-btn.green { background: linear-gradient(135deg, #00b894, #00d4ff); }
+.io-btn.red   { background: linear-gradient(135deg, #ff6b6b, #ff1744); }
+.io-btn.gold  { background: linear-gradient(135deg, #ffd700, #ff9500); color: #000; }
+.file-input { display: none; }
+
+.log-item {
+  padding: 10px; background: rgba(255,255,255,0.04);
+  border-left: 3px solid #00d4ff; border-radius: 6px;
+  margin-bottom: 6px; font-size: 12px; line-height: 1.6;
+}
+.log-item .log-time  { color: #a0a0b8; font-size: 11px; }
+.log-item .log-code  { color: #7b2ff7; font-family: 'Courier New', monospace; font-weight: 700; }
+.log-item .log-prize { color: #ffd700; font-weight: 800; }
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #00b894; color: #fff;
+  padding: 12px 22px; border-radius: 10px;
+  font-weight: 700; font-size: 14px; z-index: 2000;
+  transition: transform 0.3s;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  max-width: 90%; text-align: center;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.err { background: #ff1744; }
+</style>
+</head>
+
+<body>
+
+<div id="watermarkLayer"></div>
+<div id="mainWatermark">SPIN FF • PROPERTY BANDAR • DO NOT COPY</div>
+
+<div id="blockerOverlay">
+  <div class="icon">🚫</div>
+  <h2>KONTEN DILINDUNGI</h2>
+  <p>Layar terkunci sementara.<br>Kembali ke halaman ini untuk melanjutkan.</p>
+</div>
+
+<div id="spinLock">
+  <div class="lock-icon">🔒</div>
+  <h3>SEDANG MEMUTAR</h3>
+  <p>Jangan tutup / screenshot halaman ini</p>
+</div>
+
+<div id="screenshotWarn">📸 Screenshot terdeteksi! Aktivitas Anda dicatat.</div>
+
+<div class="container">
+
+  <h1 id="secretTap">💎 SPIN DIAMOND FF</h1>
+  <div class="subtitle">Import voucher & spin</div>
+
+  <!-- IMPORT VOUCHER -->
+  <div class="import-box">
+    <div class="imp-title">📥 IMPORT VOUCHER</div>
+    <div class="imp-info">
+      Belum punya voucher?<br>
+      Minta file voucher dari admin.
+    </div>
+    <input type="file" id="voucherFileInput" accept=".json" onchange="importVoucherFile(event)">
+    <button class="import-btn" onclick="document.getElementById('voucherFileInput').click()">
+      📂 Pilih File Voucher (.json)
+    </button>
+    <div id="voucherCountDisplay"></div>
+  </div>
+
+  <!-- INPUT KODE VOUCHER -->
+  <div class="voucher-box">
+    <div class="voucher-label">🔑 KODE VOUCHER</div>
+    <div class="voucher-input-wrap">
+      <input type="text" id="voucherInput" placeholder="FF-XXXX-XXXX-XXXX"
+             maxlength="17" autocomplete="off" spellcheck="false">
+      <button id="checkBtn" onclick="checkVoucher()">CEK</button>
+    </div>
+    <div class="voucher-status" id="voucherStatus"></div>
+  </div>
+
+  <!-- RODA -->
+  <div class="wheel-area" id="wheelArea">
+    <div class="pointer"></div>
+    <div class="wheel" id="wheel">
+      <div class="center">DM</div>
+    </div>
+  </div>
+
+  <button id="spinButton" onclick="spin()" disabled>🔒 MASUKKAN VOUCHER DULU</button>
+
+  <div class="result">
+    <div class="result-title">HASIL SPIN</div>
+    <div class="result-value" id="result">-</div>
+  </div>
+
+  <button class="history-toggle" onclick="toggleHistory()">📜 RIWAYAT SPIN SAYA</button>
+
+  <div class="history-panel" id="historyPanel">
+    <div class="history-title">RIWAYAT SPIN TERSIMPAN</div>
+    <div id="historyList"></div>
+  </div>
+
+</div>
+
+<!-- MODAL ADMIN -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>👑 PANEL BANDAR</h2>
+      <button class="close-btn" onclick="closeAdmin()">✕</button>
+    </div>
+
+    <div id="adminLogin" class="admin-login">
+      <label>🔐 Password Admin</label>
+      <input type="password" id="adminPassword" placeholder="Masukkan password..."
+             onkeypress="if(event.key==='Enter')doLogin()">
+      <button onclick="doLogin()">MASUK</button>
+      <div class="login-err" id="loginErr"></div>
+    </div>
+
+    <div id="adminPanel" style="display:none;">
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="switchTab(event, 'stats')">📊 Statistik</button>
+        <button class="admin-tab" onclick="switchTab(event, 'generate')">🎰 Generate</button>
+        <button class="admin-tab" onclick="switchTab(event, 'vouchers')">📋 Voucher</button>
+        <button class="admin-tab" onclick="switchTab(event, 'logs')">📜 Log Spin</button>
+        <button class="admin-tab" onclick="switchTab(event, 'io')">💾 Backup</button>
+      </div>
+
+      <div id="tab-stats" class="admin-tab-content active">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div style="margin-top:14px;">
+          <button class="io-btn red" onclick="resetAllData()">🗑️ Hapus SEMUA Data</button>
+        </div>
+      </div>
+
+      <div id="tab-generate" class="admin-tab-content">
+        <p style="font-size:12px;color:#a0a0b8;margin-bottom:12px;">
+          Tentukan jumlah voucher per tier. Setelah generate, klik
+          <strong style="color:#ffd700;">Export untuk Pemain</strong> untuk kirim ke pemain.
+        </p>
+        <div class="gen-form">
+          <div class="field"><label>Common (10 DM)</label><input type="number" id="gen-common" value="10" min="0"></div>
+          <div class="field"><label>Uncommon (20 DM)</label><input type="number" id="gen-uncommon" value="3" min="0"></div>
+          <div class="field"><label>Rare (50 DM)</label><input type="number" id="gen-rare" value="2" min="0"></div>
+          <div class="field"><label>Epic (100 DM)</label><input type="number" id="gen-epic" value="1" min="0"></div>
+          <div class="field"><label>Legendary (280 DM)</label><input type="number" id="gen-legendary" value="0" min="0"></div>
+          <div class="field"><label>Jackpot (355 DM)</label><input type="number" id="gen-jackpot" value="0" min="0"></div>
+          <div class="field"><label>Masa Berlaku (hari)</label><input type="number" id="gen-expiry" value="30" min="1"></div>
+        </div>
+        <button class="gen-btn" onclick="doGenerate()">✨ GENERATE VOUCHER</button>
+        <button class="gen-btn gold" onclick="exportForPlayer()">📤 Export untuk Pemain</button>
+        <button class="gen-btn warn" onclick="copyGenerated()">📋 Copy Kode</button>
+        <div id="genResult" style="margin-top:14px;font-size:12px;color:#a0a0b8;"></div>
+      </div>
+
+      <div id="tab-vouchers" class="admin-tab-content">
+        <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap;">
+          <input type="text" id="searchVoucher" placeholder="🔍 Cari hash / tier..."
+                 oninput="renderVoucherTable()"
+                 style="flex:1;min-width:200px;padding:8px 12px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#fff;font-size:13px;">
+          <select id="filterStatus" onchange="renderVoucherTable()"
+                  style="padding:8px 12px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#fff;font-size:13px;">
+            <option value="all">Semua Status</option>
+            <option value="active">Aktif</option>
+            <option value="used">Sudah Dipakai</option>
+            <option value="expired">Kadaluarsa</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Hash</th><th>Tier</th><th>Hadiah</th><th>Status</th><th>Kadaluarsa</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="voucherTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-logs" class="admin-tab-content">
+        <p style="font-size:12px;color:#a0a0b8;margin-bottom:12px;">
+          Log spin lokal (hanya dari HP admin ini).
+        </p>
+        <div id="logList" style="max-height:420px;overflow-y:auto;"></div>
+      </div>
+
+      <div id="tab-io" class="admin-tab-content">
+        <div class="io-box">
+          <h3>📤 EXPORT UNTUK PEMAIN</h3>
+          <p>Download file voucher untuk dikirim ke pemain. File berisi kode voucher yang belum dipakai.</p>
+          <button class="io-btn gold" onclick="exportForPlayer()">📤 Download File Voucher (.json)</button>
+          <button class="io-btn" onclick="copyAllCodes()">📋 Copy Semua Kode</button>
+        </div>
+        <div class="io-box">
+          <h3>💾 BACKUP ADMIN (Full Data)</h3>
+          <p>Backup lengkap termasuk log, status, dan device ID. Untuk pindah HP admin.</p>
+          <button class="io-btn green" onclick="exportFullBackup()">⬇️ Download Backup Admin</button>
+        </div>
+        <div class="io-box">
+          <h3>📥 IMPORT BACKUP ADMIN</h3>
+          <p>Pulihkan data backup admin (bukan file voucher pemain).</p>
+          <input type="file" id="importAdminFile" class="file-input" accept=".json" onchange="importAdminBackup(event)">
+          <button class="io-btn" onclick="document.getElementById('importAdminFile').click()">📂 Pilih File Backup Admin</button>
+        </div>
+        <div class="io-box">
+          <h3>🔄 RESET DATABASE</h3>
+          <p>Hapus SEMUA voucher & log di HP ini.</p>
+          <button class="io-btn red" onclick="resetAllData()">🗑️ Reset Semua Data</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   KONFIGURASI
+   ============================================================ */
+const prizes = [10, 20, 50, 70, 100, 140, 280, 355];
+const SEGMENT = 45;
+const NUM = prizes.length;
+
+const TIER_MAP = {
+  common:    { index: 0, prize: 10 },
+  uncommon:  { index: 1, prize: 20 },
+  rare:      { index: 2, prize: 50 },
+  epic:      { index: 4, prize: 100 },
+  legendary: { index: 6, prize: 280 },
+  jackpot:   { index: 7, prize: 355 },
+};
+
+/* ============================================================
+   🔐 PASSWORD ADMIN — GANTI DI SINI
+   ============================================================ */
+const ADMIN_PASSWORD = "admin123";
+
+/* ============================================================
+   DEVICE ID
+   ============================================================ */
+function getDeviceId() {
+  let id = localStorage.getItem("ff_device_id");
+  if (!id) {
+    id = "DEV-" + Math.random().toString(36).substr(2, 8).toUpperCase();
+    localStorage.setItem("ff_device_id", id);
+  }
+  return id;
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const LS_VOUCHER_DB = "ff_pro_voucher_db";
+const LS_HISTORY    = "ff_pro_history";
+const LS_ADMIN_DEV  = "ff_admin_device";
+
+let rotation = 0;
+let spinning = false;
+let currentVoucher = null;
+let voucherDB = {};
+let historyLog = [];
+let isBlurred = false;
+let adminDeviceId = localStorage.getItem(LS_ADMIN_DEV);
+const myDeviceId = getDeviceId();
+
+function loadDB() {
+  try { voucherDB = JSON.parse(localStorage.getItem(LS_VOUCHER_DB)) || {}; }
+  catch { voucherDB = {}; }
+  try { historyLog = JSON.parse(localStorage.getItem(LS_HISTORY)) || []; }
+  catch { historyLog = []; }
+}
+
+function saveDB() { localStorage.setItem(LS_VOUCHER_DB, JSON.stringify(voucherDB)); }
+function saveHistory() { localStorage.setItem(LS_HISTORY, JSON.stringify(historyLog)); }
+
+/* ============================================================
+   HASH VOUCHER
+   ============================================================ */
+function hashVoucher(str) {
+  const clean = str.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  let h = 5381;
+  for (let i = 0; i < clean.length; i++) {
+    h = ((h << 5) + h) + clean.charCodeAt(i);
+    h = h & 0xFFFFFFFF;
+  }
+  let h2 = 0x811c9dc5;
+  for (let i = clean.length - 1; i >= 0; i--) {
+    h2 ^= clean.charCodeAt(i);
+    h2 = (h2 * 0x01000193) & 0xFFFFFFFF;
+  }
+  return (h >>> 0).toString(16).padStart(8,"0").slice(0,6) +
+         (h2 >>> 0).toString(16).padStart(8,"0").slice(0,6);
+}
+
+/* ============================================================
+   RENDER RODA
+   ============================================================ */
+function renderWheelNumbers() {
+  prizes.forEach((val, i) => {
+    const centerAngle = i * SEGMENT + SEGMENT / 2;
+    const el = document.createElement("div");
+    el.className = "prize";
+    el.textContent = val;
+    el.style.transform =
+      `translate(-50%, -50%) rotate(${centerAngle}deg) ` +
+      `translateY(-115px) rotate(${-centerAngle}deg)`;
+    document.getElementById("wheel").appendChild(el);
+  });
+}
+
+/* ============================================================
+   📥 IMPORT VOUCHER (untuk pemain)
+   ============================================================ */
+function importVoucherFile(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      if (!data.vouchers || typeof data.vouchers !== "object") {
+        throw new Error("Format file salah. Pastikan file dari admin.");
+      }
+
+      const jumlah = Object.keys(data.vouchers).length;
+      if (jumlah === 0) {
+        showToast("File voucher kosong.", true);
+        ev.target.value = "";
+        return;
+      }
+
+      let baru = 0;
+      let sudahAda = 0;
+
+      for (const hash in data.vouchers) {
+        if (!voucherDB[hash]) {
+          voucherDB[hash] = data.vouchers[hash];
+          baru++;
+        } else {
+          sudahAda++;
+        }
+      }
+
+      saveDB();
+      showToast(`✅ ${baru} voucher baru di-import!${sudahAda > 0 ? ` (${sudahAda} sudah ada)` : ''}`);
+
+      if (data.batchName) {
+        document.getElementById("voucherCountDisplay").innerHTML = `
+          <div class="voucher-count-badge">📦 ${data.batchName}</div>
+        `;
+      }
+
+      updateVoucherCount();
+    } catch (err) {
+      showToast("❌ Gagal import: " + err.message, true);
+    }
+    ev.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+function updateVoucherCount() {
+  const total = Object.keys(voucherDB).length;
+  let aktif = 0;
+  for (const h in voucherDB) {
+    const v = voucherDB[h];
+    if (!v.usedAt && (!v.expiresAt || Date.now() < v.expiresAt)) aktif++;
+  }
+
+  if (total > 0) {
+    const el = document.getElementById("voucherCountDisplay");
+    if (el) {
+      el.innerHTML = `<div class="voucher-count-badge">💎 ${aktif} voucher aktif dari ${total} total</div>`;
+    }
+  }
+}
+
+/* ============================================================
+   CEK VOUCHER
+   ============================================================ */
+function checkVoucher() {
+  const raw = document.getElementById("voucherInput").value.trim();
+  const statusEl = document.getElementById("voucherStatus");
+  const inputEl  = document.getElementById("voucherInput");
+
+  const format = /^FF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i;
+  if (!format.test(raw)) {
+    statusEl.className = "voucher-status err";
+    statusEl.textContent = "❌ Format salah. Contoh: FF-1A2B-3C4D-5E6F";
+    inputEl.classList.remove("ok"); inputEl.classList.add("err");
+    return;
+  }
+
+  const hash = hashVoucher(raw);
+  const data = voucherDB[hash];
+
+  if (!data) {
+    statusEl.className = "voucher-status err";
+    statusEl.textContent = "❌ Kode voucher tidak valid / belum di-import.";
+    inputEl.classList.remove("ok"); inputEl.classList.add("err");
+    return;
+  }
+
+  if (data.expiresAt && Date.now() > data.expiresAt) {
+    statusEl.className = "voucher-status err";
+    statusEl.textContent = "⏰ Voucher sudah kadaluarsa!";
+    inputEl.classList.remove("ok"); inputEl.classList.add("err");
+    return;
+  }
+
+  if (data.usedAt) {
+    statusEl.className = "voucher-status err";
+    statusEl.textContent = "⚠️ Voucher ini sudah pernah dipakai!";
+    inputEl.classList.remove("ok"); inputEl.classList.add("err");
+    return;
+  }
+
+  currentVoucher = { raw: raw.toUpperCase(), hash, ...data };
+  statusEl.className = "voucher-status ok";
+  statusEl.textContent = "✅ Voucher valid! Silakan spin.";
+  inputEl.classList.remove("err"); inputEl.classList.add("ok");
+
+  document.getElementById("wheelArea").classList.add("active");
+  const btn = document.getElementById("spinButton");
+  btn.disabled = false;
+  btn.textContent = "🎰 SPIN SEKARANG";
+}
+
+/* ============================================================
+   SPIN
+   ============================================================ */
+function spin() {
+  if (spinning || !currentVoucher) return;
+
+  spinning = true;
+  const btn = document.getElementById("spinButton");
+  btn.disabled = true;
+  document.getElementById("result").textContent = "Memutar...";
+  document.getElementById("spinLock").classList.add("show");
+
+  const index = currentVoucher.prizeIndex;
+  const prize = prizes[index];
+  const centerAngle = index * SEGMENT + SEGMENT / 2;
+
+  const currentMod = ((rotation % 360) + 360) % 360;
+  const targetMod  = ((-centerAngle % 360) + 360) % 360;
+  let delta = targetMod - currentMod;
+  if (delta < 0) delta += 360;
+  rotation += delta + 360 * 6;
+
+  document.getElementById("wheel").style.transform = `rotate(${rotation}deg)`;
+
+  setTimeout(() => {
+    document.getElementById("result").innerHTML = `💎 ${prize} DM`;
+
+    voucherDB[currentVoucher.hash].usedAt = Date.now();
+    saveDB();
+
+    historyLog.unshift({
+      code: currentVoucher.raw,
+      hash: currentVoucher.hash,
+      prize, tier: currentVoucher.tier,
+      deviceId: myDeviceId,
+      time: new Date().toISOString()
+    });
+    saveHistory();
+    renderHistory();
+    updateVoucherCount();
+
+    currentVoucher = null;
+    document.getElementById("voucherInput").value = "";
+    document.getElementById("voucherInput").classList.remove("ok", "err");
+    document.getElementById("voucherStatus").className = "voucher-status err";
+    document.getElementById("voucherStatus").textContent = "Voucher sudah dipakai. Masukkan voucher baru.";
+    document.getElementById("wheelArea").classList.remove("active");
+    btn.textContent = "🔒 MASUKKAN VOUCHER DULU";
+
+    document.getElementById("spinLock").classList.remove("show");
+    spinning = false;
+  }, 4500);
+}
+
+/* ============================================================
+   RIWAYAT PEMAIN
+   ============================================================ */
+function renderHistory() {
+  const list = document.getElementById("historyList");
+  if (historyLog.length === 0) {
+    list.innerHTML = '<div class="history-empty">Belum ada riwayat spin.</div>';
+    return;
+  }
+  list.innerHTML = historyLog.slice(0, 30).map(h => {
+    const d = new Date(h.time);
+    const tgl = d.toLocaleDateString("id-ID", { day:"2-digit", month:"short", year:"numeric" });
+    const jam = d.toLocaleTimeString("id-ID", { hour:"2-digit", minute:"2-digit" });
+    return `
+      <div class="history-item">
+        <div>🔑 <span style="color:#7b2ff7;font-family:'Courier New',monospace;font-weight:700">${h.code}</span></div>
+        <div>💎 <span style="color:#ffd700;font-weight:800">${h.prize} DM</span></div>
+        <div style="color:#a0a0b8;font-size:11px">🕐 ${tgl} • ${jam}</div>
+      </div>`;
+  }).join("");
+}
+
+function toggleHistory() {
+  const p = document.getElementById("historyPanel");
+  p.classList.toggle("open");
+  if (p.classList.contains("open")) renderHistory();
+}
+
+/* ============================================================
+   AUTO FORMAT INPUT
+   ============================================================ */
+document.getElementById("voucherInput").addEventListener("input", (e) => {
+  let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (v.startsWith("FF")) v = v.slice(2);
+  v = v.slice(0, 12);
+  let out = "FF";
+  if (v.length > 0) out += "-" + v.slice(0, 4);
+  if (v.length > 4) out += "-" + v.slice(4, 8);
+  if (v.length > 8) out += "-" + v.slice(8, 12);
+  e.target.value = out;
+});
+
+document.getElementById("voucherInput").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") checkVoucher();
+});
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+function showToast(msg, isError = false) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast" + (isError ? " err" : "");
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2800);
+}
+
+/* ============================================================
+   🔐 LOGIN ADMIN — TAHAN JUDUL 30 DETIK
+   ============================================================ */
+let holdTimer = null;
+let holdStart = 0;
+let progressInterval = null;
+const HOLD_DURATION = 30000; // 30 detik
+
+const tapEl = document.getElementById("secretTap");
+
+function startHold(e) {
+  if (e) e.preventDefault();
+
+  if (document.getElementById("adminModal").classList.contains("open")) return;
+
+  holdStart = Date.now();
+
+  let progressBar = document.getElementById("holdProgress");
+  if (!progressBar) {
+    progressBar = document.createElement("div");
+    progressBar.id = "holdProgress";
+    progressBar.style.cssText = `
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 280px;
+      height: 8px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      overflow: visible;
+      z-index: 3000;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.3s;
+    `;
+    progressBar.innerHTML = `
+      <div id="holdProgressFill" style="
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #00d4ff, #ffd700);
+        transition: width 0.1s linear;
+        border-radius: 10px;
+        position: absolute;
+        top: 0;
+        left: 0;
+      "></div>
+      <div id="holdProgressText" style="
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #ffd700;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 1px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        white-space: nowrap;
+      ">TAHAN TERUS... 30s</div>
+    `;
+    document.body.appendChild(progressBar);
+  }
+
+  setTimeout(() => { progressBar.style.opacity = "1"; }, 50);
+
+  progressInterval = setInterval(() => {
+    const elapsed = Date.now() - holdStart;
+    const percent = Math.min(100, (elapsed / HOLD_DURATION) * 100);
+    const sisa = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
+
+    const fill = document.getElementById("holdProgressFill");
+    const text = document.getElementById("holdProgressText");
+
+    if (fill) fill.style.width = percent + "%";
+    if (text) text.textContent = `TAHAN TERUS... ${sisa}s`;
+
+    if (elapsed >= HOLD_DURATION) {
+      stopHold();
+      openAdmin();
+    }
+  }, 100);
+
+  holdTimer = setTimeout(() => {
+    stopHold();
+    openAdmin();
+  }, HOLD_DURATION);
+}
+
+function stopHold(e) {
+  if (e) e.preventDefault();
+
+  clearTimeout(holdTimer);
+  clearInterval(progressInterval);
+  holdTimer = null;
+  progressInterval = null;
+
+  const progressBar = document.getElementById("holdProgress");
+  if (progressBar) {
+    progressBar.style.opacity = "0";
+    setTimeout(() => {
+      if (progressBar.parentNode) progressBar.parentNode.removeChild(progressBar);
+    }, 300);
+  }
+
+  holdStart = 0;
+}
+
+tapEl.addEventListener("mousedown", startHold);
+tapEl.addEventListener("mouseup", stopHold);
+tapEl.addEventListener("mouseleave", stopHold);
+
+tapEl.addEventListener("touchstart", startHold, {passive: false});
+tapEl.addEventListener("touchend", stopHold);
+tapEl.addEventListener("touchcancel", stopHold);
+
+tapEl.addEventListener("contextmenu", (e) => e.preventDefault());
+tapEl.addEventListener("selectstart", (e) => e.preventDefault());
+
+/* ============================================================
+   🔐 ADMIN DEVICE LOCK
+   ============================================================ */
+function openAdmin() {
+  // Cek device lock
+  if (adminDeviceId && adminDeviceId !== myDeviceId) {
+    showToast("🚫 Panel admin terkunci di perangkat lain!", true);
+    alert(
+      "🚫 AKSES DITOLAK\n\n" +
+      "Panel admin sudah terdaftar di perangkat lain.\n" +
+      "Hanya 1 perangkat yang bisa jadi admin.\n\n" +
+      "Device Anda: " + myDeviceId + "\n" +
+      "Device admin: " + adminDeviceId + "\n\n" +
+      "Untuk ganti perangkat, gunakan tombol 'Reset Device Admin' di HP admin lama."
+    );
+    return;
+  }
+
+  document.getElementById("adminModal").classList.add("open");
+  document.getElementById("adminLogin").style.display = "block";
+  document.getElementById("adminPanel").style.display = "none";
+  document.getElementById("adminPassword").value = "";
+  document.getElementById("loginErr").textContent = "";
+
+  if (!adminDeviceId) {
+    document.getElementById("loginErr").textContent =
+      "ℹ️ Perangkat ini akan didaftarkan sebagai admin utama.";
+  }
+
+  setTimeout(() => {
+    document.getElementById("adminPassword").focus();
+  }, 100);
+}
+
+function closeAdmin() { document.getElementById("adminModal").classList.remove("open"); }
+
+function doLogin() {
+  const pass = document.getElementById("adminPassword").value;
+
+  if (pass !== ADMIN_PASSWORD) {
+    document.getElementById("loginErr").textContent = "❌ Password salah!";
+    return;
+  }
+
+  if (!adminDeviceId) {
+    adminDeviceId = myDeviceId;
+    localStorage.setItem(LS_ADMIN_DEV, adminDeviceId);
+    showToast("✅ Perangkat ini terdaftar sebagai admin utama!");
+  } else if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Perangkat lain sudah jadi admin!", true);
+    return;
+  }
+
+  document.getElementById("adminLogin").style.display = "none";
+  document.getElementById("adminPanel").style.display = "block";
+  refreshAdmin();
+  showToast("✅ Login berhasil!");
+}
+
+/* ============================================================
+   🔄 RESET DEVICE ADMIN
+   ============================================================ */
+function resetAdminDevice() {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa reset!", true);
+    return;
+  }
+
+  if (!confirm("⚠️ Reset device admin?\n\nSetelah ini, HP lain bisa jadi admin baru.\n\nLanjutkan?")) return;
+
+  localStorage.removeItem(LS_ADMIN_DEV);
+  adminDeviceId = null;
+  refreshAdmin();
+  showToast("✅ Device admin direset. HP lain bisa login admin.");
+}
+
+/* ============================================================
+   ADMIN PANEL
+   ============================================================ */
+function switchTab(ev, tab) {
+  document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".admin-tab-content").forEach(t => t.classList.remove("active"));
+  ev.target.classList.add("active");
+  document.getElementById("tab-" + tab).classList.add("active");
+  if (tab === "vouchers") renderVoucherTable();
+  if (tab === "logs")     renderLogs();
+  if (tab === "stats")    renderStats();
+}
+
+function renderStats() {
+  const total = Object.keys(voucherDB).length;
+  let active = 0, used = 0, expired = 0;
+  let totalPrize = 0, usedPrize = 0;
+
+  for (const h in voucherDB) {
+    const v = voucherDB[h];
+    if (v.usedAt) { used++; usedPrize += v.prize; }
+    else if (v.expiresAt && Date.now() > v.expiresAt) expired++;
+    else active++;
+    totalPrize += v.prize;
+  }
+
+  document.getElementById("statsGrid").innerHTML = `
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Voucher</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#00b894">${active}</div><div class="stat-label">Aktif</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#a0a0b8">${used}</div><div class="stat-label">Terpakai</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#ff5252">${expired}</div><div class="stat-label">Kadaluarsa</div></div>
+    <div class="stat-card"><div class="stat-value" style="font-size:18px">${usedPrize} DM</div><div class="stat-label">Hadiah Terbagi</div></div>
+    <div class="stat-card"><div class="stat-value" style="font-size:18px">${totalPrize} DM</div><div class="stat-label">Potensi Total</div></div>
+    <div class="stat-card" style="grid-column: 1/-1;">
+      <div style="font-size:11px;color:#a0a0b8;margin-bottom:6px;">📱 DEVICE ADMIN</div>
+      <div style="font-size:13px;color:${adminDeviceId === myDeviceId ? '#00b894' : '#ffd700'};font-weight:800;font-family:monospace;">
+        ${adminDeviceId || '(belum di-set)'}
+      </div>
+      <div style="font-size:10px;color:#a0a0b8;margin-top:4px;">
+        ${adminDeviceId === myDeviceId ? '✅ Perangkat ini' : '📱 Perangkat lain'}
+      </div>
+      ${adminDeviceId === myDeviceId ? '<button onclick="resetAdminDevice()" style="margin-top:8px;padding:6px 12px;background:transparent;border:1px solid #ff1744;color:#ff5252;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">🔄 Reset Device Admin</button>' : ''}
+    </div>
+  `;
+}
+
+function randomVoucherCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let kode = "FF";
+  for (let i = 0; i < 3; i++) {
+    kode += "-";
+    for (let j = 0; j < 4; j++) kode += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return kode;
+}
+
+let lastGenerated = [];
+
+function doGenerate() {
+  const expiryDays = parseInt(document.getElementById("gen-expiry").value) || 30;
+  const now = Date.now();
+  const exp = now + expiryDays * 24 * 60 * 60 * 1000;
+
+  const config = {};
+  ["common","uncommon","rare","epic","legendary","jackpot"].forEach(t => {
+    const n = parseInt(document.getElementById("gen-" + t).value) || 0;
+    if (n > 0) config[t] = n;
+  });
+
+  if (Object.keys(config).length === 0) {
+    showToast("Isi minimal 1 tier!", true);
+    return;
+  }
+
+  lastGenerated = [];
+  let totalBaru = 0;
+
+  for (const tier in config) {
+    const t = TIER_MAP[tier];
+    for (let i = 0; i < config[tier]; i++) {
+      let kode, hash;
+      do {
+        kode = randomVoucherCode();
+        hash = hashVoucher(kode);
+      } while (voucherDB[hash] || lastGenerated.find(x => x.kode === kode));
+
+      voucherDB[hash] = {
+        tier, prizeIndex: t.index, prize: t.prize,
+        createdAt: now, expiresAt: exp, usedAt: null
+      };
+      lastGenerated.push({ kode, hash, tier, prize: t.prize });
+      totalBaru++;
+    }
+  }
+
+  saveDB();
+  refreshAdmin();
+
+  document.getElementById("genResult").innerHTML = `
+    ✅ <strong style="color:#00b894">${totalBaru} voucher berhasil dibuat!</strong><br>
+    ⏰ Berlaku sampai: <strong>${new Date(exp).toLocaleDateString("id-ID", {day:"2-digit",month:"short",year:"numeric"})}</strong><br>
+    📤 Klik <strong>Export untuk Pemain</strong> untuk kirim file ke pemain.<br>
+    📋 Atau klik <strong>Copy Kode</strong> untuk salin semua kode voucher.
+  `;
+  showToast(`✅ ${totalBaru} voucher berhasil dibuat!`);
+}
+
+/* ============================================================
+   📤 EXPORT FILE UNTUK PEMAIN
+   ============================================================ */
+function exportForPlayer() {
+  const activeVouchers = {};
+  let jumlah = 0;
+
+  for (const hash in voucherDB) {
+    const v = voucherDB[hash];
+    if (!v.usedAt && (!v.expiresAt || Date.now() < v.expiresAt)) {
+      activeVouchers[hash] = {
+        tier: v.tier,
+        prizeIndex: v.prizeIndex,
+        prize: v.prize,
+        expiresAt: v.expiresAt
+      };
+      jumlah++;
+    }
+  }
+
+  if (jumlah === 0) {
+    showToast("Tidak ada voucher aktif untuk di-export!", true);
+    return;
+  }
+
+  const batchName = prompt(
+    `Akan export ${jumlah} voucher aktif.\n\nMasukkan nama batch:`,
+    "Batch-" + new Date().toISOString().slice(0, 10)
+  );
+
+  if (!batchName) return;
+
+  const data = {
+    format: "ff-spin-voucher",
+    version: 1,
+    batchName: batchName,
+    exportedAt: new Date().toISOString(),
+    jumlah: jumlah,
+    vouchers: activeVouchers
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `voucher-${batchName.replace(/[^A-Za-z0-9]/g, "_")}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  showToast(`📤 ${jumlah} voucher berhasil di-export!`);
+}
+
+/* ============================================================
+   📋 COPY SEMUA KODE VOUCHER
+   ============================================================ */
+function copyAllCodes() {
+  if (lastGenerated.length === 0) {
+    showToast("Generate voucher dulu, lalu copy kode.", true);
+    return;
+  }
+
+  const teks = lastGenerated.map(v =>
+    `${v.kode}  [${v.tier.toUpperCase()}] → ${v.prize} DM`
+  ).join("\n");
+
+  navigator.clipboard.writeText(teks).then(() => {
+    showToast(`📋 ${lastGenerated.length} kode voucher disalin!`);
+  }).catch(() => {
+    const ta = document.createElement("textarea");
+    ta.value = teks;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    showToast(`📋 ${lastGenerated.length} kode voucher disalin!`);
+  });
+}
+
+function copyGenerated() { copyAllCodes(); }
+
+/* ============================================================
+   TABEL VOUCHER
+   ============================================================ */
+function renderVoucherTable() {
+  const tbody = document.getElementById("voucherTableBody");
+  const q = document.getElementById("searchVoucher").value.toLowerCase();
+  const filter = document.getElementById("filterStatus").value;
+
+  const rows = [];
+  for (const hash in voucherDB) {
+    const v = voucherDB[hash];
+    let status, statusClass;
+    if (v.usedAt) { status = "Terpakai"; statusClass = "used"; }
+    else if (v.expiresAt && Date.now() > v.expiresAt) { status = "Kadaluarsa"; statusClass = "expired"; }
+    else { status = "Aktif"; statusClass = "active"; }
+
+    if (filter !== "all" && statusClass !== filter) continue;
+    if (q && !hash.includes(q) && !v.tier.includes(q)) continue;
+    rows.push({ hash, ...v, status, statusClass });
+  }
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#666;padding:24px;">Tidak ada voucher</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(v => {
+    const exp = v.expiresAt ? new Date(v.expiresAt).toLocaleDateString("id-ID", {day:"2-digit",month:"short",year:"2-digit"}) : "-";
+    return `
+      <tr>
+        <td style="font-family:'Courier New',monospace;font-size:11px;color:#7b2ff7">${v.hash}</td>
+        <td><span class="badge ${v.tier}">${v.tier}</span></td>
+        <td style="color:#ffd700;font-weight:800">${v.prize} DM</td>
+        <td><span class="badge ${v.statusClass}">${v.status}</span></td>
+        <td style="font-size:11px;color:#a0a0b8">${exp}</td>
+        <td><button onclick="deleteVoucher('${v.hash}')" style="background:transparent;border:1px solid #ff1744;color:#ff5252;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer;">Hapus</button></td>
+      </tr>`;
+  }).join("");
+}
+
+function deleteVoucher(hash) {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa hapus!", true);
+    return;
+  }
+  if (!confirm("Hapus voucher ini?")) return;
+  delete voucherDB[hash];
+  saveDB();
+  renderVoucherTable();
+  renderStats();
+  showToast("🗑️ Voucher dihapus");
+}
+
+function renderLogs() {
+  const el = document.getElementById("logList");
+  if (historyLog.length === 0) {
+    el.innerHTML = '<div class="history-empty">Belum ada log spin.</div>';
+    return;
+  }
+  el.innerHTML = historyLog.map(h => {
+    const d = new Date(h.time);
+    const tgl = d.toLocaleDateString("id-ID", {day:"2-digit",month:"short",year:"numeric"});
+    const jam = d.toLocaleTimeString("id-ID", {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    return `
+      <div class="log-item">
+        <div class="log-time">🕐 ${tgl} • ${jam} • 📱 ${h.deviceId || "-"}</div>
+        <div>🔑 <span class="log-code">${h.code}</span> <span class="badge ${h.tier}">${h.tier}</span></div>
+        <div>💎 Hadiah: <span class="log-prize">${h.prize} DM</span></div>
+      </div>`;
+  }).join("");
+}
+
+/* ============================================================
+   BACKUP ADMIN LENGKAP
+   ============================================================ */
+function exportFullBackup() {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa backup!", true);
+    return;
+  }
+
+  const data = {
+    format: "ff-spin-admin-backup",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    adminDeviceId: adminDeviceId,
+    deviceId: myDeviceId,
+    voucherDB: voucherDB,
+    historyLog: historyLog
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `admin-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast("💾 Backup admin berhasil di-download!");
+}
+
+function importAdminBackup(ev) {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa import!", true);
+    ev.target.value = "";
+    return;
+  }
+
+  const file = ev.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+
+      if (data.format !== "ff-spin-admin-backup") {
+        throw new Error("File bukan backup admin.");
+      }
+
+      if (!data.voucherDB) throw new Error("Data voucher kosong.");
+
+      const jmlV = Object.keys(data.voucherDB).length;
+      const jmlL = (data.historyLog || []).length;
+
+      if (!confirm(`⚠️ Import backup admin?\n\n- ${jmlV} voucher\n- ${jmlL} log\n\nData saat ini akan DITIMPA.`)) {
+        ev.target.value = "";
+        return;
+      }
+
+      voucherDB = data.voucherDB;
+      historyLog = data.historyLog || [];
+      saveDB();
+      saveHistory();
+      refreshAdmin();
+      renderHistory();
+      showToast(`✅ Import ${jmlV} voucher & ${jmlL} log berhasil!`);
+    } catch (err) {
+      showToast("❌ Gagal import: " + err.message, true);
+    }
+    ev.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   RESET
+   ============================================================ */
+function resetAllData() {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa reset!", true);
+    return;
+  }
+
+  if (!confirm("⚠️ HAPUS SEMUA DATA?\n\nSemua voucher & log akan hilang.\n\nLanjutkan?")) return;
+  if (!confirm("⚠️ YAKIN? Tidak bisa dibatalkan!")) return;
+
+  voucherDB = {};
+  historyLog = [];
+  saveDB();
+  saveHistory();
+  refreshAdmin();
+  renderHistory();
+  updateVoucherCount();
+  showToast("🗑️ Semua data dihapus!");
+}
+
+function refreshAdmin() {
+  renderStats();
+  renderVoucherTable();
+  renderLogs();
+}
+
+/* ============================================================
+   PROTEKSI ANTI SCREENSHOT
+   ============================================================ */
+document.addEventListener("contextmenu", (e) => {
+  if (e.target.closest("input")) return;
+  e.preventDefault();
+  showToast("🚫 Klik kanan diblokir!", true);
+});
+
+document.addEventListener("selectstart", (e) => {
+  if (e.target.closest("input")) return;
+  e.preventDefault();
+});
+
+document.addEventListener("dragstart", (e) => {
+  if (e.target.closest("input")) return;
+  e.preventDefault();
+});
+
+document.addEventListener("keydown", (e) => {
+  const key = e.key.toLowerCase();
+  if (e.target.closest("input")) return;
+
+  if (e.key === "PrintScreen") {
+    e.preventDefault();
+    triggerScreenshotWarning();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText("");
+    }
+    return false;
+  }
+
+  if (e.ctrlKey || e.metaKey) {
+    const blocked = ["c", "s", "p", "u", "a", "x"];
+    if (blocked.includes(key)) {
+      e.preventDefault();
+      showToast(`🚫 Ctrl+${key.toUpperCase()} diblokir!`, true);
+      return false;
+    }
+    if (e.shiftKey && ["i", "j", "c"].includes(key)) {
+      e.preventDefault();
+      showToast("🚫 DevTools diblokir!", true);
+      return false;
+    }
+  }
+
+  if (e.key === "F12") {
+    e.preventDefault();
+    showToast("🚫 DevTools diblokir!", true);
+    return false;
+  }
+});
+
+window.addEventListener("blur", () => {
+  isBlurred = true;
+  setTimeout(() => {
+    if (isBlurred && !document.getElementById("adminModal").classList.contains("open")) {
+      document.getElementById("blockerOverlay").classList.add("show");
+    }
+  }, 150);
+});
+
+window.addEventListener("focus", () => {
+  isBlurred = false;
+  document.getElementById("blockerOverlay").classList.remove("show");
+});
+
+let lastW = window.innerWidth, lastH = window.innerHeight;
+window.addEventListener("resize", () => {
+  const dw = Math.abs(window.innerWidth - lastW);
+  const dh = Math.abs(window.innerHeight - lastH);
+  if ((dw > 200 || dh > 200) && !document.getElementById("adminModal").classList.contains("open")) {
+    triggerScreenshotWarning();
+  }
+  lastW = window.innerWidth;
+  lastH = window.innerHeight;
+  buildWatermark();
+});
+
+function triggerScreenshotWarning() {
+  const warn = document.getElementById("screenshotWarn");
+  warn.classList.add("show");
+  setTimeout(() => warn.classList.remove("show"), 3000);
+
+  document.body.style.filter = "blur(20px)";
+  document.getElementById("blockerOverlay").classList.add("show");
+  setTimeout(() => {
+    if (!isBlurred) {
+      document.body.style.filter = "";
+      document.getElementById("blockerOverlay").classList.remove("show");
+    }
+  }, 1500);
+
+  try {
+    const logs = JSON.parse(localStorage.getItem("ff_screenshot_log") || "[]");
+    logs.unshift({
+      deviceId: myDeviceId,
+      time: new Date().toISOString()
+    });
+    localStorage.setItem("ff_screenshot_log", JSON.stringify(logs.slice(0, 50)));
+  } catch {}
+}
+
+/* Watermark guard */
+setInterval(() => {
+  const wl = document.getElementById("watermarkLayer");
+  const mw = document.getElementById("mainWatermark");
+  if (!wl || !wl.parentNode || !mw || !mw.parentNode) location.reload();
+}, 2000);
+
+/* ============================================================
+   WATERMARK
+   ============================================================ */
+function buildWatermark() {
+  const deviceId = getDeviceId();
+  const tanggal = new Date().toLocaleDateString("id-ID");
+  const text = `SPIN FF • ${deviceId} • ${tanggal} • DO NOT COPY `;
+
+  const layer = document.getElementById("watermarkLayer");
+  let html = "";
+  for (let r = 0; r < 20; r++) {
+    for (let c = 0; c < 6; c++) html += `<span>${text}</span>`;
+    html += "<br>";
+  }
+  layer.innerHTML = html;
+
+  document.getElementById("mainWatermark").textContent = `${deviceId} • ${tanggal}`;
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+loadDB();
+buildWatermark();
+renderWheelNumbers();
+renderHistory();
+updateVoucherCount();
+
+setInterval(buildWatermark, 60000);
+
+/* ============================================================
+   BYPASS DARURAT (kalau tombol tahan tidak berfungsi)
+   ============================================================
+   Buka F12 → Console → ketik: bukaAdminDarurat()
+   ============================================================ */
+window.bukaAdminDarurat = function() {
+  document.getElementById("adminModal").classList.add("open");
+  document.getElementById("adminLogin").style.display = "block";
+  document.getElementById("adminPanel").style.display = "none";
+  document.getElementById("adminPassword").value = "";
+  document.getElementById("loginErr").textContent = "⚠️ Bypass darurat aktif.";
+  setTimeout(() => {
+    document.getElementById("adminPassword").focus();
+  }, 100);
+  console.log("⚠️ Bypass darurat. Password tetap diperlukan.");
+};
+
+/* ============================================================
+   INFO CONSOLE
+   ============================================================ */
+console.log("%c🎰 SPIN FF — FINAL", "color:#ffd700;font-size:18px;font-weight:bold");
+console.log("%c═══════════════════════════════════", "color:#00d4ff");
+console.log("🔐 CARA BUKA PANEL ADMIN:");
+console.log("   TAHAN JUDUL '💎 SPIN DIAMOND FF' SELAMA 30 DETIK");
+console.log("");
+console.log("🔑 PASSWORD: admin123");
+console.log("");
+console.log("🆘 DARURAT: bukaAdminDarurat()");
+console.log("%c═══════════════════════════════════", "color:#00d4ff");
+console.log("🛡️ Proteksi aktif:");
+console.log("  ✅ Watermark dinamis");
+console.log("  ✅ Blokir Ctrl+C/S/P/U/A/X & F12");
+console.log("  ✅ Blokir PrintScreen");
+console.log("  ✅ Blur saat window kehilangan fokus");
+console.log("  ✅ Kunci layar saat spin");
+console.log("  ✅ Admin device lock (1 HP)");
+</script>
+
+</body>
+</html>
