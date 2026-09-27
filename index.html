@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spin Diamond FF</title>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  color: #fff;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  overflow-x: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.container { width: 100%; max-width: 440px; text-align: center; }
+
+/* WATERMARK */
+#watermarkLayer {
+  position: fixed; inset: 0; pointer-events: none; z-index: 900;
+  opacity: 0.08; overflow: hidden; font-size: 14px; color: #fff;
+  font-weight: 700; line-height: 80px; white-space: nowrap;
+  transform: rotate(-30deg) scale(1.5); transform-origin: center;
+}
+#watermarkLayer span { display: inline-block; padding: 0 40px; }
+
+#mainWatermark {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%) rotate(-25deg);
+  font-size: 38px; font-weight: 900;
+  color: rgba(255, 215, 0, 0.06);
+  pointer-events: none; z-index: 899;
+  white-space: nowrap; letter-spacing: 4px; text-transform: uppercase;
+}
+
+/* OVERLAY */
+#blockerOverlay {
+  display: none; position: fixed; inset: 0; background: #000;
+  z-index: 10000; justify-content: center; align-items: center;
+  flex-direction: column; text-align: center; padding: 30px;
+}
+#blockerOverlay.show { display: flex; }
+#blockerOverlay .icon { font-size: 80px; margin-bottom: 20px; }
+#blockerOverlay h2 { font-size: 24px; color: #ff5252; margin-bottom: 10px; }
+#blockerOverlay p { color: #a0a0b8; font-size: 14px; line-height: 1.6; }
+
+#spinLock {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.9); backdrop-filter: blur(20px);
+  z-index: 1500; justify-content: center; align-items: center;
+  flex-direction: column; text-align: center;
+}
+#spinLock.show { display: flex; }
+#spinLock .lock-icon { font-size: 80px; animation: pulse 1.5s infinite; margin-bottom: 20px; }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.7; }
+}
+#spinLock h3 { font-size: 22px; color: #ffd700; letter-spacing: 2px; margin-bottom: 8px; }
+#spinLock p { color: #a0a0b8; font-size: 14px; }
+
+#screenshotWarn {
+  display: none; position: fixed; top: 20px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,23,68,0.95); color: #fff;
+  padding: 10px 20px; border-radius: 8px; font-size: 13px;
+  font-weight: 700; z-index: 5000;
+}
+#screenshotWarn.show { display: block; }
+
+/* JUDUL */
+h1#secretTap {
+  font-size: 26px; margin-bottom: 4px;
+  background: linear-gradient(90deg, #00d4ff, #7b2ff7, #f107a3);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; font-weight: 800; letter-spacing: 1px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  user-select: none; display: inline-block; padding: 4px 8px;
+  transition: transform 0.15s;
+}
+h1#secretTap:active { transform: scale(0.98); }
+.subtitle { color: #a0a0b8; font-size: 13px; margin-bottom: 16px; }
+
+/* KARTU SALDO */
+.balance-card {
+  background: linear-gradient(135deg, rgba(255,215,0,0.12), rgba(123,47,247,0.12));
+  border: 2px solid rgba(255,215,0,0.4);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+.balance-card::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -30%;
+  width: 150px; height: 150px;
+  background: radial-gradient(circle, rgba(255,215,0,0.15), transparent 70%);
+  pointer-events: none;
+}
+.balance-left { text-align: left; position: relative; z-index: 1; }
+.balance-label {
+  font-size: 10px; color: #a0a0b8;
+  letter-spacing: 2px; font-weight: 700; margin-bottom: 4px;
+}
+.balance-value {
+  font-size: 32px; font-weight: 900;
+  background: linear-gradient(90deg, #ffd700, #ff9500);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; line-height: 1;
+}
+.balance-unit {
+  font-size: 13px; color: #ffd700;
+  font-weight: 700; margin-top: 4px; letter-spacing: 1px;
+}
+.balance-right { text-align: right; position: relative; z-index: 1; }
+.total-label {
+  font-size: 10px; color: #a0a0b8;
+  letter-spacing: 2px; font-weight: 700; margin-bottom: 4px;
+}
+.total-value { font-size: 22px; font-weight: 900; color: #00d4ff; }
+.total-value small { font-size: 12px; color: #a0a0b8; font-weight: 700; }
+
+/* IMPORT ZONE */
+.import-zone {
+  display: block;
+  background: rgba(255,215,0,0.06);
+  border: 2px dashed rgba(255,215,0,0.4);
+  border-radius: 14px;
+  padding: 24px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.import-zone:hover, .import-zone:active {
+  background: rgba(255,215,0,0.15);
+  border-color: #ffd700;
+  transform: scale(1.02);
+}
+.import-zone .imp-icon { font-size: 44px; margin-bottom: 8px; display: block; }
+.import-zone .imp-title {
+  font-size: 15px; color: #ffd700;
+  font-weight: 800; letter-spacing: 1px; margin-bottom: 4px;
+}
+.import-zone .imp-sub { font-size: 11px; color: #a0a0b8; line-height: 1.5; }
+
+.paste-toggle-btn {
+  width: 100%; padding: 11px; margin-bottom: 10px;
+  background: rgba(0,212,255,0.12);
+  border: 1px solid rgba(0,212,255,0.4);
+  color: #00d4ff; border-radius: 10px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: 0.3s;
+}
+.paste-toggle-btn:active { transform: scale(0.97); }
+
+#pasteZone {
+  display: none; margin-bottom: 12px; padding: 14px;
+  background: rgba(255,215,0,0.06);
+  border: 2px dashed rgba(255,215,0,0.4);
+  border-radius: 12px; text-align: left;
+}
+#pasteZone .paste-title {
+  font-size: 12px; color: #ffd700;
+  font-weight: 700; margin-bottom: 8px;
+}
+#pasteZone .paste-info {
+  font-size: 11px; color: #a0a0b8;
+  margin-bottom: 8px; line-height: 1.5;
+}
+#pasteTextarea {
+  width: 100%; min-height: 100px;
+  padding: 10px; background: #0d1117;
+  border: 2px solid #30363d;
+  border-radius: 8px; color: #fff;
+  font-size: 11px; font-family: 'Courier New', monospace;
+  outline: none; resize: vertical;
+}
+#pasteTextarea:focus { border-color: #ffd700; }
+.import-paste-btn {
+  width: 100%; margin-top: 8px; padding: 10px;
+  background: linear-gradient(135deg, #00b894, #00d4ff);
+  border: none; border-radius: 8px;
+  color: #fff; font-weight: 800; font-size: 13px;
+  cursor: pointer;
+}
+
+/* INPUT FILE TERSEMBUNYI */
+#voucherFileInput,
+#importAdminFile {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* HINT */
+.hint-box {
+  padding: 14px;
+  background: rgba(0,212,255,0.08);
+  border: 1px solid rgba(0,212,255,0.3);
+  border-radius: 10px;
+  font-size: 12px; color: #a0a0b8;
+  line-height: 1.6; margin-bottom: 16px;
+}
+.hint-box strong { color: #00d4ff; }
+
+/* RODA */
+.wheel-area {
+  position: relative; width: 310px; height: 310px; margin: auto;
+  opacity: 0.35; transition: opacity 0.5s;
+}
+.wheel-area.active { opacity: 1; }
+
+.pointer {
+  position: absolute; top: -10px; left: 50%;
+  transform: translateX(-50%); width: 0; height: 0;
+  border-left: 16px solid transparent;
+  border-right: 16px solid transparent;
+  border-top: 34px solid #ff1744;
+  z-index: 20;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+}
+.pointer::after {
+  content: ''; position: absolute; top: -34px; left: -10px;
+  width: 20px; height: 20px;
+  background: radial-gradient(circle at 30% 30%, #ff5252, #b71c1c);
+  border-radius: 50%; box-shadow: 0 0 10px rgba(255,23,68,0.8);
+}
+
+.wheel {
+  position: relative; width: 300px; height: 300px; margin: auto;
+  border: 5px solid #ffd700; border-radius: 50%;
+  box-shadow:
+    0 0 25px rgba(255, 215, 0, 0.5),
+    0 0 60px rgba(123, 47, 247, 0.4),
+    inset 0 0 20px rgba(0,0,0,0.3);
+  background: conic-gradient(
+    #2c2c3e 0deg 40deg, #ff6b6b 40deg 80deg, #4ecdc4 80deg 120deg,
+    #ffd93d 120deg 160deg, #6c5ce7 160deg 200deg, #ff9f43 200deg 240deg,
+    #00b894 240deg 280deg, #e84393 280deg 320deg, #0984e3 320deg 360deg
+  );
+  transition: transform 4.5s cubic-bezier(.17,.67,.12,.99);
+}
+
+.prize {
+  position: absolute; top: 50%; left: 50%;
+  width: 60px; height: 55px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 800; color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.7); z-index: 5;
+}
+.prize.zonk-text { color: #ff5252; font-size: 14px; font-weight: 900; }
+
+.center {
+  position: absolute; width: 78px; height: 78px;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  border-radius: 50%; background: radial-gradient(circle at 30% 30%, #333, #000);
+  color: #ffd700; display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 18px; border: 3px solid #ffd700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.7), inset 0 0 10px rgba(255, 215, 0, 0.3);
+  z-index: 10; letter-spacing: 1px;
+}
+
+/* TOMBOL SPIN */
+button#spinButton {
+  width: 100%; margin-top: 20px; padding: 16px;
+  background: linear-gradient(135deg, #7b2ff7, #f107a3);
+  color: #fff; border: none; border-radius: 12px;
+  font-size: 17px; font-weight: 800; cursor: pointer;
+  letter-spacing: 1px;
+  box-shadow: 0 6px 20px rgba(123, 47, 247, 0.5);
+  transition: all 0.3s ease;
+}
+button#spinButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(241, 7, 163, 0.6);
+}
+button#spinButton:disabled {
+  background: #555; cursor: not-allowed;
+  box-shadow: none; transform: none;
+}
+
+/* HASIL */
+.result {
+  margin-top: 16px; padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 215, 0, 0.4);
+  border-radius: 12px;
+}
+.result-title {
+  color: #a0a0b8; font-size: 11px;
+  margin-bottom: 4px; letter-spacing: 2px;
+}
+.result-value {
+  font-size: 26px; font-weight: 900;
+  background: linear-gradient(90deg, #00d4ff, #ffd700);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.result-value.zonk {
+  background: none;
+  -webkit-text-fill-color: #ff5252;
+  color: #ff5252;
+  animation: shake 0.5s;
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+
+/* RIWAYAT */
+.history-toggle {
+  margin-top: 14px; width: 100%; padding: 11px;
+  background: rgba(255,255,255,0.08); color: #00d4ff;
+  border: 2px solid rgba(0,212,255,0.3); border-radius: 10px;
+  font-weight: 700; cursor: pointer; font-size: 13px;
+}
+.history-panel {
+  display: none; margin-top: 10px; padding: 12px;
+  background: rgba(0,0,0,0.4); border: 2px solid rgba(0,212,255,0.3);
+  border-radius: 10px; text-align: left;
+  max-height: 240px; overflow-y: auto;
+}
+.history-panel.open { display: block; }
+.history-title {
+  font-size: 11px; color: #00d4ff; letter-spacing: 2px;
+  margin-bottom: 8px; font-weight: 700;
+}
+.history-item {
+  padding: 8px 10px; background: rgba(255,255,255,0.05);
+  border-left: 3px solid #ffd700; border-radius: 6px;
+  margin-bottom: 6px; font-size: 12px; line-height: 1.5;
+}
+.history-item.zonk { border-left-color: #ff5252; }
+.history-empty {
+  color: #666; font-size: 12px;
+  text-align: center; padding: 16px;
+}
+
+/* MODAL ADMIN */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.85); backdrop-filter: blur(6px);
+  z-index: 1000; justify-content: center; align-items: flex-start;
+  padding: 20px; overflow-y: auto;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  width: 100%; max-width: 900px;
+  background: #0d1117; border: 2px solid rgba(255,215,0,0.5);
+  border-radius: 14px; padding: 22px; margin: auto;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 18px; padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,215,0,0.3);
+}
+.modal-header h2 { font-size: 20px; color: #ffd700; letter-spacing: 1px; }
+.close-btn {
+  background: transparent; border: 1px solid #ff1744;
+  color: #ff5252; width: 32px; height: 32px;
+  border-radius: 6px; font-size: 16px; font-weight: 900; cursor: pointer;
+}
+.admin-login { max-width: 340px; margin: 40px auto; }
+.admin-login label {
+  display: block; font-size: 13px; color: #a0a0b8;
+  margin-bottom: 6px; text-align: left;
+}
+.admin-login input {
+  width: 100%; padding: 12px 14px; background: #161b22;
+  border: 2px solid #30363d; border-radius: 8px; color: #fff;
+  font-size: 15px; outline: none; margin-bottom: 14px;
+}
+.admin-login input:focus { border-color: #ffd700; }
+.admin-login button {
+  width: 100%; padding: 12px;
+  background: linear-gradient(135deg, #ffd700, #ff9500);
+  color: #000; border: none; border-radius: 8px;
+  font-weight: 800; font-size: 15px; cursor: pointer;
+}
+.login-err {
+  color: #ff5252; font-size: 13px;
+  margin-top: 8px; min-height: 18px;
+}
+.admin-tabs {
+  display: flex; gap: 6px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.admin-tab {
+  padding: 8px 14px; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15); color: #a0a0b8;
+  border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.admin-tab.active {
+  background: rgba(255,215,0,0.2);
+  border-color: #ffd700; color: #ffd700;
+}
+.admin-tab-content { display: none; }
+.admin-tab-content.active { display: block; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px; margin-bottom: 18px;
+}
+.stat-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 10px; padding: 14px; text-align: center;
+}
+.stat-value {
+  font-size: 26px; font-weight: 900;
+  color: #ffd700; margin-bottom: 4px;
+}
+.stat-label {
+  font-size: 11px; color: #a0a0b8;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.gen-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin-bottom: 14px;
+}
+.gen-form .field label {
+  display: block; font-size: 11px; color: #a0a0b8;
+  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;
+}
+.gen-form .field input {
+  width: 100%; padding: 8px 10px; background: #161b22;
+  border: 1px solid #30363d; border-radius: 6px;
+  color: #fff; font-size: 14px; outline: none;
+}
+.gen-btn {
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #00b894, #00d4ff);
+  color: #fff; border: none; border-radius: 8px;
+  font-weight: 800; font-size: 14px; cursor: pointer;
+  margin-right: 8px; margin-bottom: 8px;
+}
+.gen-btn.warn { background: linear-gradient(135deg, #ff6b6b, #ff1744); }
+.gen-btn.gold { background: linear-gradient(135deg, #ffd700, #ff9500); color: #000; }
+.table-wrap {
+  overflow-x: auto; max-height: 400px; overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+}
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  background: rgba(255,215,0,0.1); color: #ffd700;
+  padding: 10px 8px; text-align: left; font-size: 11px;
+  letter-spacing: 1px; text-transform: uppercase;
+  position: sticky; top: 0; z-index: 5;
+}
+td { padding: 8px; border-top: 1px solid rgba(255,255,255,0.05); }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.badge.active    { background: rgba(0,184,148,0.2); color: #00b894; border: 1px solid #00b894; }
+.badge.used      { background: rgba(160,160,184,0.2); color: #a0a0b8; border: 1px solid #a0a0b8; }
+.badge.expired   { background: rgba(255,23,68,0.2); color: #ff5252; border: 1px solid #ff5252; }
+.badge.zonk      { background: rgba(255,23,68,0.3); color: #ff5252; border: 1px solid #ff5252; font-weight: 900; }
+.badge.common    { background: rgba(200,200,200,0.15); color: #ccc; }
+.badge.uncommon  { background: rgba(78,205,196,0.15); color: #4ecdc4; }
+.badge.rare      { background: rgba(255,217,61,0.15); color: #ffd93d; }
+.badge.epic      { background: rgba(108,92,231,0.2); color: #a29bfe; }
+.badge.legendary { background: rgba(232,67,147,0.2); color: #fd79a8; }
+.badge.jackpot   { background: rgba(255,215,0,0.25); color: #ffd700; }
+.io-box {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; padding: 16px; margin-bottom: 12px;
+}
+.io-box h3 {
+  font-size: 14px; color: #ffd700;
+  margin-bottom: 8px; letter-spacing: 1px;
+}
+.io-box p {
+  font-size: 12px; color: #a0a0b8;
+  margin-bottom: 10px; line-height: 1.5;
+}
+.io-btn {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #7b2ff7, #f107a3);
+  color: #fff; border: none; border-radius: 8px;
+  font-weight: 800; font-size: 13px; cursor: pointer;
+  margin-right: 8px; margin-bottom: 8px;
+  display: inline-block;
+}
+.io-btn.green { background: linear-gradient(135deg, #00b894, #00d4ff); }
+.io-btn.red   { background: linear-gradient(135deg, #ff6b6b, #ff1744); }
+.io-btn.gold  { background: linear-gradient(135deg, #ffd700, #ff9500); color: #000; }
+.log-item {
+  padding: 10px; background: rgba(255,255,255,0.04);
+  border-left: 3px solid #00d4ff; border-radius: 6px;
+  margin-bottom: 6px; font-size: 12px; line-height: 1.6;
+}
+.log-item.zonk { border-left-color: #ff5252; }
+.log-item .log-time  { color: #a0a0b8; font-size: 11px; }
+.log-item .log-prize { color: #ffd700; font-weight: 800; }
+.toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #00b894; color: #fff;
+  padding: 12px 22px; border-radius: 10px;
+  font-weight: 700; font-size: 14px; z-index: 2000;
+  transition: transform 0.3s;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  max-width: 90%; text-align: center;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.err { background: #ff1744; }
+</style>
+</head>
+
+<body>
+
+<div id="watermarkLayer"></div>
+<div id="mainWatermark">SPIN FF • PROPERTY BANDAR • DO NOT COPY</div>
+
+<div id="blockerOverlay">
+  <div class="icon">🚫</div>
+  <h2>KONTEN DILINDUNGI</h2>
+  <p>Layar terkunci sementara.<br>Kembali ke halaman ini untuk melanjutkan.</p>
+</div>
+
+<div id="spinLock">
+  <div class="lock-icon">🔒</div>
+  <h3>SEDANG MEMUTAR</h3>
+  <p>Jangan tutup / screenshot halaman ini</p>
+</div>
+
+<div id="screenshotWarn">📸 Screenshot terdeteksi! Aktivitas Anda dicatat.</div>
+
+<div class="container">
+
+  <h1 id="secretTap">💎 SPIN DIAMOND FF</h1>
+  <div class="subtitle">Import voucher, langsung spin!</div>
+
+  <div class="balance-card" id="balanceCard" style="display:none;">
+    <div class="balance-left">
+      <div class="balance-label">SISA SPIN</div>
+      <div class="balance-value" id="balanceValue">0</div>
+      <div class="balance-unit">🎰 KALI</div>
+    </div>
+    <div class="balance-right">
+      <div class="total-label">TOTAL HADIAH</div>
+      <div class="total-value" id="totalPrizeValue">0 <small>DM</small></div>
+    </div>
+  </div>
+
+  <div id="importSection">
+    <label for="voucherFileInput" class="import-zone" id="importZone">
+      <span class="imp-icon">📥</span>
+      <div class="imp-title">IMPORT FILE VOUCHER</div>
+      <div class="imp-sub">
+        Ketuk untuk pilih file dari memory HP (.json)<br>
+        Setiap voucher = 1 kali spin
+      </div>
+    </label>
+    <input type="file" id="voucherFileInput" accept=".json,application/json,text/plain" onchange="importVoucherFile(event)">
+
+    <button class="paste-toggle-btn" type="button" onclick="togglePasteMode()">
+      📋 Atau paste kode JSON voucher di sini
+    </button>
+
+    <div id="pasteZone">
+      <div class="paste-title">📋 PASTE KODE JSON VOUCHER</div>
+      <div class="paste-info">
+        Buka file .json → Copy semua isinya → Paste di bawah ini
+      </div>
+      <textarea id="pasteTextarea" placeholder='{"format":"ff-spin-voucher","vouchers":{...}}'></textarea>
+      <button class="import-paste-btn" type="button" onclick="importFromPaste()">
+        ✅ IMPORT DARI PASTE
+      </button>
+    </div>
+  </div>
+
+  <div class="hint-box" id="hintBox">
+    💡 <strong>Belum punya voucher?</strong><br>
+    Hubungi admin untuk mendapatkan file voucher (.json).
+  </div>
+
+  <div class="wheel-area" id="wheelArea">
+    <div class="pointer"></div>
+    <div class="wheel" id="wheel">
+      <div class="center">DM</div>
+    </div>
+  </div>
+
+  <button id="spinButton" onclick="spin()" disabled>🔒 IMPORT VOUCHER DULU</button>
+
+  <div class="result">
+    <div class="result-title">HASIL SPIN TERAKHIR</div>
+    <div class="result-value" id="result">-</div>
+  </div>
+
+  <button class="history-toggle" onclick="toggleHistory()">📜 RIWAYAT SPIN</button>
+
+  <div class="history-panel" id="historyPanel">
+    <div class="history-title">RIWAYAT SPIN TERSIMPAN</div>
+    <div id="historyList"></div>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="adminModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>👑 PANEL BANDAR</h2>
+      <button class="close-btn" onclick="closeAdmin()">✕</button>
+    </div>
+
+    <div id="adminLogin" class="admin-login">
+      <label>🔐 Password Admin</label>
+      <input type="password" id="adminPassword" placeholder="Masukkan password..."
+             onkeypress="if(event.key==='Enter')doLogin()">
+      <button onclick="doLogin()">MASUK</button>
+      <div class="login-err" id="loginErr"></div>
+    </div>
+
+    <div id="adminPanel" style="display:none;">
+      <div class="admin-tabs">
+        <button class="admin-tab active" onclick="switchTab(event, 'stats')">📊 Statistik</button>
+        <button class="admin-tab" onclick="switchTab(event, 'generate')">🎰 Generate</button>
+        <button class="admin-tab" onclick="switchTab(event, 'vouchers')">📋 Voucher</button>
+        <button class="admin-tab" onclick="switchTab(event, 'logs')">📜 Log Spin</button>
+        <button class="admin-tab" onclick="switchTab(event, 'io')">💾 Backup</button>
+      </div>
+
+      <div id="tab-stats" class="admin-tab-content active">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div style="margin-top:14px;">
+          <button class="io-btn red" onclick="resetAllData()">🗑️ Hapus SEMUA Data</button>
+        </div>
+      </div>
+
+      <div id="tab-generate" class="admin-tab-content">
+        <p style="font-size:12px;color:#a0a0b8;margin-bottom:12px;">
+          Tentukan jumlah voucher per tier. <strong style="color:#ff5252;">ZONK</strong> = hadiah 0 DM (bandar untung).
+        </p>
+        <div class="gen-form">
+          <div class="field"><label style="color:#ff5252;font-weight:800;">🎰 ZONK (0 DM)</label><input type="number" id="gen-zonk" value="20" min="0"></div>
+          <div class="field"><label>Common (10 DM)</label><input type="number" id="gen-common" value="10" min="0"></div>
+          <div class="field"><label>Uncommon (20 DM)</label><input type="number" id="gen-uncommon" value="3" min="0"></div>
+          <div class="field"><label>Rare (50 DM)</label><input type="number" id="gen-rare" value="2" min="0"></div>
+          <div class="field"><label>Epic (100 DM)</label><input type="number" id="gen-epic" value="1" min="0"></div>
+          <div class="field"><label>Legendary (280 DM)</label><input type="number" id="gen-legendary" value="0" min="0"></div>
+          <div class="field"><label>Jackpot (355 DM)</label><input type="number" id="gen-jackpot" value="0" min="0"></div>
+          <div class="field"><label>Masa Berlaku (hari)</label><input type="number" id="gen-expiry" value="30" min="1"></div>
+        </div>
+        <button class="gen-btn" onclick="doGenerate()">✨ GENERATE VOUCHER</button>
+        <button class="gen-btn gold" onclick="exportForPlayer()">📤 Export untuk Pemain</button>
+        <button class="gen-btn warn" onclick="copyJsonVoucher()">📋 Copy JSON Voucher</button>
+        <div id="genResult" style="margin-top:14px;font-size:12px;color:#a0a0b8;"></div>
+      </div>
+
+      <div id="tab-vouchers" class="admin-tab-content">
+        <div style="margin-bottom:12px; display:flex; gap:8px; flex-wrap:wrap;">
+          <input type="text" id="searchVoucher" placeholder="🔍 Cari hash / tier..."
+                 oninput="renderVoucherTable()"
+                 style="flex:1;min-width:200px;padding:8px 12px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#fff;font-size:13px;">
+          <select id="filterStatus" onchange="renderVoucherTable()"
+                  style="padding:8px 12px;background:#161b22;border:1px solid #30363d;border-radius:6px;color:#fff;font-size:13px;">
+            <option value="all">Semua Status</option>
+            <option value="active">Aktif</option>
+            <option value="used">Sudah Dipakai</option>
+            <option value="expired">Kadaluarsa</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Hash</th><th>Tier</th><th>Hadiah</th><th>Status</th><th>Kadaluarsa</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="voucherTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="tab-logs" class="admin-tab-content">
+        <p style="font-size:12px;color:#a0a0b8;margin-bottom:12px;">
+          Log spin lokal (hanya dari HP admin ini).
+        </p>
+        <div id="logList" style="max-height:420px;overflow-y:auto;"></div>
+      </div>
+
+      <div id="tab-io" class="admin-tab-content">
+        <div class="io-box">
+          <h3>📤 EXPORT UNTUK PEMAIN</h3>
+          <p>Download file voucher untuk dikirim ke pemain.</p>
+          <button class="io-btn gold" onclick="exportForPlayer()">📤 Download File Voucher (.json)</button>
+          <button class="io-btn warn" onclick="copyJsonVoucher()">📋 Copy JSON Voucher</button>
+        </div>
+        <div class="io-box">
+          <h3>💾 BACKUP ADMIN</h3>
+          <p>Backup lengkap termasuk log, status, dan device ID.</p>
+          <button class="io-btn green" onclick="exportFullBackup()">⬇️ Download Backup Admin</button>
+        </div>
+        <div class="io-box">
+          <h3>📥 IMPORT BACKUP ADMIN</h3>
+          <p>Pulihkan data backup admin.</p>
+          <input type="file" id="importAdminFile" accept=".json,application/json" onchange="importAdminBackup(event)">
+          <label for="importAdminFile" class="io-btn" style="cursor:pointer;">📂 Pilih File Backup Admin</label>
+        </div>
+        <div class="io-box">
+          <h3>🔄 RESET DATABASE</h3>
+          <p>Hapus SEMUA voucher & log di HP ini.</p>
+          <button class="io-btn red" onclick="resetAllData()">🗑️ Reset Semua Data</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   KONFIGURASI — 9 SLOT
+   ============================================================ */
+const PRIZES = [0, 10, 20, 50, 70, 100, 140, 280, 355];
+const SEGMENT = 40;
+
+const TIER_MAP = {
+  zonk:      { index: 0, prize: 0 },
+  common:    { index: 1, prize: 10 },
+  uncommon:  { index: 2, prize: 20 },
+  rare:      { index: 3, prize: 50 },
+  epic:      { index: 5, prize: 100 },
+  legendary: { index: 7, prize: 280 },
+  jackpot:   { index: 8, prize: 355 },
+};
+
+const ADMIN_PASSWORD = "admin123";
+
+/* ============================================================
+   DEVICE ID
+   ============================================================ */
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem("ff_device_id");
+    if (!id) {
+      id = "DEV-" + Math.random().toString(36).substr(2, 8).toUpperCase();
+      localStorage.setItem("ff_device_id", id);
+    }
+    return id;
+  } catch {
+    return "DEV-UNKNOWN";
+  }
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const LS_VOUCHER_DB   = "ff_pro_voucher_db";
+const LS_HISTORY      = "ff_pro_history";
+const LS_ADMIN_DEV    = "ff_admin_device";
+const LS_PLAYER_SALDO = "ff_player_saldo";
+
+let rotation = 0;
+let spinning = false;
+let voucherDB = {};
+let historyLog = [];
+let playerSaldo = [];
+let isBlurred = false;
+let adminDeviceId = null;
+let myDeviceId = "DEV-UNKNOWN";
+
+/* Safe localStorage helpers */
+function lsGet(key) {
+  try { return localStorage.getItem(key); }
+  catch { return null; }
+}
+function lsSet(key, val) {
+  try { localStorage.setItem(key, val); return true; }
+  catch { return false; }
+}
+function lsRemove(key) {
+  try { localStorage.removeItem(key); return true; }
+  catch { return false; }
+}
+function lsGetJSON(key, fallback) {
+  try {
+    const raw = lsGet(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed === null ? fallback : parsed;
+  } catch { return fallback; }
+}
+
+function loadDB() {
+  voucherDB  = lsGetJSON(LS_VOUCHER_DB, {});
+  historyLog = lsGetJSON(LS_HISTORY, []);
+  playerSaldo = lsGetJSON(LS_PLAYER_SALDO, []);
+  adminDeviceId = lsGet(LS_ADMIN_DEV);
+
+  // Pastikan tipe data benar
+  if (typeof voucherDB !== "object" || voucherDB === null) voucherDB = {};
+  if (!Array.isArray(historyLog)) historyLog = [];
+  if (!Array.isArray(playerSaldo)) playerSaldo = [];
+
+  myDeviceId = getDeviceId();
+}
+
+function saveDB()      { lsSet(LS_VOUCHER_DB, JSON.stringify(voucherDB)); }
+function saveHistory() { lsSet(LS_HISTORY, JSON.stringify(historyLog)); }
+function saveSaldo()   { lsSet(LS_PLAYER_SALDO, JSON.stringify(playerSaldo)); }
+
+/* ============================================================
+   HASH VOUCHER
+   ============================================================ */
+function hashVoucher(str) {
+  const clean = String(str).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  let h = 5381;
+  for (let i = 0; i < clean.length; i++) {
+    h = ((h << 5) + h) + clean.charCodeAt(i);
+    h = h & 0xFFFFFFFF;
+  }
+  let h2 = 0x811c9dc5;
+  for (let i = clean.length - 1; i >= 0; i--) {
+    h2 ^= clean.charCodeAt(i);
+    h2 = (h2 * 0x01000193) & 0xFFFFFFFF;
+  }
+  return (h >>> 0).toString(16).padStart(8, "0").slice(0, 6) +
+         (h2 >>> 0).toString(16).padStart(8, "0").slice(0, 6);
+}
+
+/* ============================================================
+   SHUFFLE ARRAY
+   ============================================================ */
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/* ============================================================
+   SHUFFLE SALDO — anti zonk streak
+   ============================================================ */
+function shuffleSaldo() {
+  if (!Array.isArray(playerSaldo) || playerSaldo.length === 0) return;
+
+  const aktif = playerSaldo.filter(h => {
+    const v = voucherDB[h];
+    return v && !v.usedAt && (!v.expiresAt || Date.now() < v.expiresAt);
+  });
+
+  if (aktif.length === 0) return;
+
+  const zonkList = aktif.filter(h => voucherDB[h].prize === 0);
+  const hadiahList = aktif.filter(h => voucherDB[h].prize > 0);
+
+  shuffleArray(zonkList);
+  shuffleArray(hadiahList);
+
+  const hasil = [];
+  let z = 0, h = 0, zonkStreak = 0;
+
+  while (z < zonkList.length || h < hadiahList.length) {
+    if (zonkStreak >= 2 && h < hadiahList.length) {
+      hasil.push(hadiahList[h++]);
+      zonkStreak = 0;
+      continue;
+    }
+    if (z >= zonkList.length) {
+      hasil.push(hadiahList[h++]);
+      zonkStreak = 0;
+      continue;
+    }
+    if (h >= hadiahList.length) {
+      hasil.push(zonkList[z++]);
+      zonkStreak++;
+      continue;
+    }
+    if (Math.random() < 0.6) {
+      hasil.push(zonkList[z++]);
+      zonkStreak++;
+    } else {
+      hasil.push(hadiahList[h++]);
+      zonkStreak = 0;
+    }
+  }
+
+  playerSaldo = hasil;
+  saveSaldo();
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+function showToast(msg, isError = false) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.className = "toast" + (isError ? " err" : "");
+  t.classList.add("show");
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => t.classList.remove("show"), 2800);
+}
+
+/* ============================================================
+   TOGGLE PASTE MODE
+   ============================================================ */
+function togglePasteMode() {
+  const pz = document.getElementById("pasteZone");
+  if (!pz) return;
+  pz.style.display = (pz.style.display === "none" || !pz.style.display) ? "block" : "none";
+}
+
+/* ============================================================
+   IMPORT VOUCHER (FILE)
+   ============================================================ */
+function importVoucherFile(ev) {
+  const input = ev.target;
+  const file = input.files && input.files[0];
+  if (!file) return;
+
+  const nameLower = file.name.toLowerCase();
+  const validExt = nameLower.endsWith(".json") || nameLower.endsWith(".txt") || !nameLower.includes(".");
+
+  if (!validExt) {
+    showToast("❌ File harus .json", true);
+    input.value = "";
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onerror = () => {
+    showToast("❌ Gagal baca file. Coba paste manual.", true);
+    input.value = "";
+    togglePasteMode();
+  };
+  reader.onload = (e) => {
+    try {
+      processImportedText(e.target.result);
+    } catch (err) {
+      showToast("❌ " + err.message, true);
+    }
+    input.value = "";
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   IMPORT DARI PASTE
+   ============================================================ */
+function importFromPaste() {
+  const ta = document.getElementById("pasteTextarea");
+  if (!ta) return;
+  const text = ta.value.trim();
+  if (!text) {
+    showToast("❌ Belum ada yang di-paste", true);
+    return;
+  }
+  try {
+    processImportedText(text);
+    ta.value = "";
+  } catch (err) {
+    showToast("❌ " + err.message, true);
+  }
+}
+
+/* ============================================================
+   PROSES IMPORT
+   ============================================================ */
+function processImportedText(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error("File bukan JSON yang valid");
+  }
+
+  if (!data || typeof data !== "object") {
+    throw new Error("Format file salah");
+  }
+  if (!data.vouchers || typeof data.vouchers !== "object") {
+    throw new Error("Format file salah. Minta file baru dari admin.");
+  }
+
+  const jumlah = Object.keys(data.vouchers).length;
+  if (jumlah === 0) throw new Error("File voucher kosong");
+
+  let baru = 0, sudahAda = 0;
+
+  for (const hash in data.vouchers) {
+    const v = data.vouchers[hash];
+    if (!v || typeof v !== "object") continue;
+    if (!voucherDB[hash]) {
+      voucherDB[hash] = v;
+      baru++;
+    } else {
+      sudahAda++;
+    }
+    if (!voucherDB[hash].usedAt && !playerSaldo.includes(hash)) {
+      playerSaldo.push(hash);
+    }
+  }
+
+  saveDB();
+  saveSaldo();
+  shuffleSaldo();
+
+  // Update UI
+  const bc = document.getElementById("balanceCard");
+  const hb = document.getElementById("hintBox");
+  const is = document.getElementById("importSection");
+  if (bc) bc.style.display = "flex";
+  if (hb) hb.style.display = "none";
+  if (is) is.style.display = "none";
+
+  updatePlayerUI();
+
+  let msg = `✅ ${baru} voucher di-import!`;
+  if (sudahAda > 0) msg += ` (${sudahAda} sudah ada)`;
+  showToast(msg);
+
+  if (data.batchName) {
+    const sub = document.querySelector(".subtitle");
+    if (sub) sub.textContent = `📦 ${data.batchName}`;
+  }
+}
+
+/* ============================================================
+   RENDER RODA
+   ============================================================ */
+function renderWheelNumbers() {
+  const wheel = document.getElementById("wheel");
+  if (!wheel) return;
+  // Bersihkan prize lama (kecuali .center)
+  wheel.querySelectorAll(".prize").forEach(p => p.remove());
+
+  PRIZES.forEach((val, i) => {
+    const centerAngle = i * SEGMENT + SEGMENT / 2;
+    const el = document.createElement("div");
+    el.className = "prize";
+    if (val === 0) {
+      el.classList.add("zonk-text");
+      el.textContent = "ZONK";
+    } else {
+      el.textContent = val;
+    }
+    el.style.transform =
+      `translate(-50%, -50%) rotate(${centerAngle}deg) ` +
+      `translateY(-115px) rotate(${-centerAngle}deg)`;
+    wheel.appendChild(el);
+  });
+}
+
+/* ============================================================
+   UPDATE UI PEMAIN
+   ============================================================ */
+function updatePlayerUI() {
+  const saldoValid = playerSaldo.filter(h => {
+    const v = voucherDB[h];
+    if (!v) return false;
+    if (v.usedAt) return false;
+    if (v.expiresAt && Date.now() > v.expiresAt) return false;
+    return true;
+  });
+
+  let totalPrize = 0;
+  historyLog.forEach(h => { totalPrize += (h.prize || 0); });
+
+  const bv = document.getElementById("balanceValue");
+  const tp = document.getElementById("totalPrizeValue");
+  if (bv) bv.textContent = saldoValid.length;
+  if (tp) tp.innerHTML = `${totalPrize} <small>DM</small>`;
+
+  const btn = document.getElementById("spinButton");
+  const wheelArea = document.getElementById("wheelArea");
+  if (!btn) return;
+
+  if (saldoValid.length > 0) {
+    btn.disabled = false;
+    btn.textContent = `🎰 SPIN SEKARANG (${saldoValid.length}x)`;
+    if (wheelArea) wheelArea.classList.add("active");
+  } else {
+    btn.disabled = true;
+    if (Object.keys(voucherDB).length === 0) {
+      btn.textContent = "🔒 IMPORT VOUCHER DULU";
+    } else {
+      btn.textContent = "✅ SEMUA VOUCHER SUDAH DIPAKAI";
+    }
+    if (wheelArea) wheelArea.classList.remove("active");
+  }
+}
+
+/* ============================================================
+   SPIN
+   ============================================================ */
+function spin() {
+  if (spinning) return;
+
+  const saldoValid = playerSaldo.filter(h => {
+    const v = voucherDB[h];
+    if (!v) return false;
+    if (v.usedAt) return false;
+    if (v.expiresAt && Date.now() > v.expiresAt) return false;
+    return true;
+  });
+
+  if (saldoValid.length === 0) {
+    showToast("Saldo spin habis. Import voucher baru.", true);
+    return;
+  }
+
+  spinning = true;
+  const btn = document.getElementById("spinButton");
+  btn.disabled = true;
+
+  const resultEl = document.getElementById("result");
+  resultEl.textContent = "Memutar...";
+  resultEl.classList.remove("zonk");
+
+  const spinLock = document.getElementById("spinLock");
+  if (spinLock) spinLock.classList.add("show");
+
+  const chosenHash = saldoValid[0];
+  const chosen = voucherDB[chosenHash];
+  const index = chosen.prizeIndex;
+  const prize = PRIZES[index] !== undefined ? PRIZES[index] : chosen.prize;
+  const centerAngle = index * SEGMENT + SEGMENT / 2;
+
+  const currentMod = ((rotation % 360) + 360) % 360;
+  const targetMod  = ((-centerAngle % 360) + 360) % 360;
+  let delta = targetMod - currentMod;
+  if (delta < 0) delta += 360;
+  rotation += delta + 360 * 6;
+
+  document.getElementById("wheel").style.transform = `rotate(${rotation}deg)`;
+
+  setTimeout(() => {
+    if (prize === 0) {
+      resultEl.innerHTML = `💀 ZONK!`;
+      resultEl.classList.add("zonk");
+      showToast("💀 Zonk! Coba lagi.", true);
+    } else {
+      resultEl.innerHTML = `💎 ${prize} DM`;
+      resultEl.classList.remove("zonk");
+    }
+
+    voucherDB[chosenHash].usedAt = Date.now();
+    saveDB();
+
+    playerSaldo = playerSaldo.filter(h => h !== chosenHash);
+    saveSaldo();
+
+    historyLog.unshift({
+      hash: chosenHash,
+      prize: prize,
+      tier: chosen.tier || "common",
+      deviceId: myDeviceId,
+      time: new Date().toISOString()
+    });
+    saveHistory();
+
+    renderHistory();
+    shuffleSaldo();
+    updatePlayerUI();
+
+    if (spinLock) spinLock.classList.remove("show");
+    spinning = false;
+
+    const sisaValid = playerSaldo.filter(h => {
+      const v = voucherDB[h];
+      return v && !v.usedAt && (!v.expiresAt || Date.now() < v.expiresAt);
+    });
+
+    if (sisaValid.length === 0) {
+      setTimeout(() => showToast("🎉 Semua voucher sudah dipakai!"), 1500);
+    }
+  }, 4500);
+}
+
+/* ============================================================
+   RIWAYAT
+   ============================================================ */
+function renderHistory() {
+  const list = document.getElementById("historyList");
+  if (!list) return;
+  if (historyLog.length === 0) {
+    list.innerHTML = '<div class="history-empty">Belum ada riwayat spin.</div>';
+    return;
+  }
+  list.innerHTML = historyLog.slice(0, 30).map(h => {
+    const d = new Date(h.time);
+    const tgl = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    const jam = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    const isZonk = h.prize === 0;
+    return `
+      <div class="history-item ${isZonk ? 'zonk' : ''}">
+        <div>
+          ${isZonk
+            ? '💀 <span style="color:#ff5252;font-weight:900">ZONK!</span>'
+            : `💎 <span style="color:#ffd700;font-weight:800">${h.prize} DM</span>`}
+          <span class="badge ${h.tier || 'common'}">${h.tier || 'common'}</span>
+        </div>
+        <div style="color:#a0a0b8;font-size:11px">🕐 ${tgl} • ${jam}</div>
+      </div>`;
+  }).join("");
+}
+
+function toggleHistory() {
+  const p = document.getElementById("historyPanel");
+  if (!p) return;
+  p.classList.toggle("open");
+  if (p.classList.contains("open")) renderHistory();
+}
+
+/* ============================================================
+   LOGIN ADMIN — TAHAN JUDUL 30 DETIK
+   ============================================================ */
+let holdTimer = null;
+const HOLD_DURATION = 30000;
+
+function startHold(e) {
+  if (e) e.preventDefault();
+  const modal = document.getElementById("adminModal");
+  if (modal && modal.classList.contains("open")) return;
+  const tapEl = document.getElementById("secretTap");
+  if (!tapEl) return;
+  tapEl.style.transition = "opacity 0.3s";
+  tapEl.style.opacity = "0.85";
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => {
+    holdTimer = null;
+    tapEl.style.opacity = "1";
+    openAdmin();
+  }, HOLD_DURATION);
+}
+
+function stopHold(e) {
+  if (e) e.preventDefault();
+  if (holdTimer) {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+  }
+  const tapEl = document.getElementById("secretTap");
+  if (tapEl) tapEl.style.opacity = "1";
+}
+
+/* ============================================================
+   ADMIN
+   ============================================================ */
+function openAdmin() {
+  if (adminDeviceId && adminDeviceId !== myDeviceId) {
+    showToast("🚫 Panel admin terkunci di perangkat lain!", true);
+    return;
+  }
+  const modal = document.getElementById("adminModal");
+  const login = document.getElementById("adminLogin");
+  const panel = document.getElementById("adminPanel");
+  const pass = document.getElementById("adminPassword");
+  const err = document.getElementById("loginErr");
+
+  if (!modal) return;
+  modal.classList.add("open");
+  if (login) login.style.display = "block";
+  if (panel) panel.style.display = "none";
+  if (pass) pass.value = "";
+  if (err) {
+    err.textContent = !adminDeviceId
+      ? "ℹ️ Perangkat ini akan didaftarkan sebagai admin utama."
+      : "";
+  }
+  setTimeout(() => { if (pass) pass.focus(); }, 100);
+}
+
+function closeAdmin() {
+  const modal = document.getElementById("adminModal");
+  if (modal) modal.classList.remove("open");
+}
+
+function doLogin() {
+  const pass = document.getElementById("adminPassword").value;
+  if (pass !== ADMIN_PASSWORD) {
+    document.getElementById("loginErr").textContent = "❌ Password salah!";
+    return;
+  }
+  if (!adminDeviceId) {
+    adminDeviceId = myDeviceId;
+    lsSet(LS_ADMIN_DEV, adminDeviceId);
+    showToast("✅ Perangkat ini terdaftar sebagai admin utama!");
+  } else if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Perangkat lain sudah jadi admin!", true);
+    return;
+  }
+  document.getElementById("adminLogin").style.display = "none";
+  document.getElementById("adminPanel").style.display = "block";
+  refreshAdmin();
+  showToast("✅ Login berhasil!");
+}
+
+function resetAdminDevice() {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa reset!", true);
+    return;
+  }
+  if (!confirm("⚠️ Reset device admin?")) return;
+  lsRemove(LS_ADMIN_DEV);
+  adminDeviceId = null;
+  refreshAdmin();
+  showToast("✅ Device admin direset.");
+}
+
+function switchTab(ev, tab) {
+  document.querySelectorAll(".admin-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".admin-tab-content").forEach(t => t.classList.remove("active"));
+  ev.target.classList.add("active");
+  const content = document.getElementById("tab-" + tab);
+  if (content) content.classList.add("active");
+  if (tab === "vouchers") renderVoucherTable();
+  if (tab === "logs")     renderLogs();
+  if (tab === "stats")    renderStats();
+}
+
+function renderStats() {
+  const total = Object.keys(voucherDB).length;
+  let active = 0, used = 0, expired = 0, zonk = 0;
+  let totalPrize = 0, usedPrize = 0;
+
+  for (const h in voucherDB) {
+    const v = voucherDB[h];
+    if (v.prize === 0) zonk++;
+    if (v.usedAt) { used++; usedPrize += (v.prize || 0); }
+    else if (v.expiresAt && Date.now() > v.expiresAt) expired++;
+    else active++;
+    totalPrize += (v.prize || 0);
+  }
+
+  document.getElementById("statsGrid").innerHTML = `
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total Voucher</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#00b894">${active}</div><div class="stat-label">Aktif</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#a0a0b8">${used}</div><div class="stat-label">Terpakai</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#ff5252">${expired}</div><div class="stat-label">Kadaluarsa</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#ff5252">${zonk}</div><div class="stat-label">💀 Zonk</div></div>
+    <div class="stat-card"><div class="stat-value" style="font-size:18px">${usedPrize} DM</div><div class="stat-label">Hadiah Terbagi</div></div>
+    <div class="stat-card"><div class="stat-value" style="font-size:18px">${totalPrize} DM</div><div class="stat-label">Potensi Total</div></div>
+    <div class="stat-card" style="grid-column: 1/-1;">
+      <div style="font-size:11px;color:#a0a0b8;margin-bottom:6px;">📱 DEVICE ADMIN</div>
+      <div style="font-size:13px;color:${adminDeviceId === myDeviceId ? '#00b894' : '#ffd700'};font-weight:800;font-family:monospace;">
+        ${adminDeviceId || '(belum di-set)'}
+      </div>
+      <div style="font-size:10px;color:#a0a0b8;margin-top:4px;">
+        ${adminDeviceId === myDeviceId ? '✅ Perangkat ini' : '📱 Perangkat lain'}
+      </div>
+      ${adminDeviceId === myDeviceId ? '<button onclick="resetAdminDevice()" style="margin-top:8px;padding:6px 12px;background:transparent;border:1px solid #ff1744;color:#ff5252;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">🔄 Reset Device Admin</button>' : ''}
+    </div>
+  `;
+}
+
+function randomVoucherCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let kode = "FF";
+  for (let i = 0; i < 3; i++) {
+    kode += "-";
+    for (let j = 0; j < 4; j++) kode += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return kode;
+}
+
+let lastGenerated = [];
+
+function doGenerate() {
+  const expiryDays = parseInt(document.getElementById("gen-expiry").value) || 30;
+  const now = Date.now();
+  const exp = now + expiryDays * 24 * 60 * 60 * 1000;
+
+  const config = {};
+  ["zonk", "common", "uncommon", "rare", "epic", "legendary", "jackpot"].forEach(t => {
+    const n = parseInt(document.getElementById("gen-" + t).value) || 0;
+    if (n > 0) config[t] = n;
+  });
+
+  if (Object.keys(config).length === 0) {
+    showToast("Isi minimal 1 tier!", true);
+    return;
+  }
+
+  lastGenerated = [];
+  let totalBaru = 0, totalZonk = 0, totalDM = 0;
+
+  for (const tier in config) {
+    const t = TIER_MAP[tier];
+    for (let i = 0; i < config[tier]; i++) {
+      let kode, hash, attempts = 0;
+      do {
+        kode = randomVoucherCode();
+        hash = hashVoucher(kode);
+        attempts++;
+        if (attempts > 100) break;
+      } while (voucherDB[hash] || lastGenerated.find(x => x.kode === kode));
+
+      if (attempts > 100) continue;
+
+      voucherDB[hash] = {
+        tier, prizeIndex: t.index, prize: t.prize,
+        createdAt: now, expiresAt: exp, usedAt: null
+      };
+      lastGenerated.push({ kode, hash, tier, prize: t.prize });
+      totalBaru++;
+      if (t.prize === 0) totalZonk++;
+      totalDM += t.prize;
+    }
+  }
+
+  saveDB();
+  refreshAdmin();
+
+  document.getElementById("genResult").innerHTML = `
+    ✅ <strong style="color:#00b894">${totalBaru} voucher berhasil dibuat!</strong><br>
+    💀 Zonk: <strong style="color:#ff5252">${totalZonk}</strong> voucher (0 DM)<br>
+    💎 Total hadiah: <strong style="color:#ffd700">${totalDM} DM</strong><br>
+    ⏰ Berlaku sampai: <strong>${new Date(exp).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })}</strong><br>
+    📤 Klik <strong>Export untuk Pemain</strong> atau <strong>Copy JSON Voucher</strong>.
+  `;
+  showToast(`✅ ${totalBaru} voucher berhasil dibuat!`);
+}
+
+/* ============================================================
+   EXPORT & COPY
+   ============================================================ */
+function buildVoucherData(batchName) {
+  const activeVouchers = {};
+  let jumlah = 0, zonk = 0;
+  for (const hash in voucherDB) {
+    const v = voucherDB[hash];
+    if (!v.usedAt && (!v.expiresAt || Date.now() < v.expiresAt)) {
+      activeVouchers[hash] = {
+        tier: v.tier,
+        prizeIndex: v.prizeIndex,
+        prize: v.prize,
+        expiresAt: v.expiresAt
+      };
+      jumlah++;
+      if (v.prize === 0) zonk++;
+    }
+  }
+  return {
+    data: {
+      format: "ff-spin-voucher",
+      version: 3,
+      batchName: batchName,
+      exportedAt: new Date().toISOString(),
+      jumlah: jumlah,
+      vouchers: activeVouchers
+    },
+    jumlah,
+    zonk
+  };
+}
+
+function exportForPlayer() {
+  // Cek dulu ada voucher atau tidak
+  let ada = 0;
+  for (const h in voucherDB) {
+    const v = voucherDB[h];
+    if (!v.usedAt && (!v.expiresAt || Date.now() < v.expiresAt)) ada++;
+  }
+  if (ada === 0) {
+    showToast("Tidak ada voucher aktif untuk di-export!", true);
+    return;
+  }
+
+  const batchName = prompt("Masukkan nama batch:", "Batch-" + new Date().toISOString().slice(0, 10));
+  if (!batchName) return;
+
+  const { data, jumlah, zonk } = buildVoucherData(batchName);
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `voucher-${batchName.replace(/[^A-Za-z0-9]/g, "_")}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  showToast(`📤 ${jumlah} voucher (${zonk} zonk) berhasil di-export!`);
+}
+
+function copyJsonVoucher() {
+  let ada = 0;
+  for (const h in voucherDB) {
+    const v = voucherDB[h];
+    if (!v.usedAt && (!v.expiresAt || Date.now() < v.expiresAt)) ada++;
+  }
+  if (ada === 0) {
+    showToast("Tidak ada voucher aktif untuk di-copy!", true);
+    return;
+  }
+
+  const batchName = prompt("Masukkan nama batch:", "Batch-" + new Date().toISOString().slice(0, 10));
+  if (!batchName) return;
+
+  const { data, jumlah, zonk } = buildVoucherData(batchName);
+  const teksJson = JSON.stringify(data, null, 2);
+
+  function doFallbackCopy() {
+    const ta = document.createElement("textarea");
+    ta.value = teksJson;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      showToast(`📋 JSON ${jumlah} voucher (${zonk} zonk) disalin!`);
+    } catch {
+      showToast("❌ Gagal copy. Coba download file.", true);
+    }
+    document.body.removeChild(ta);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(teksJson)
+      .then(() => showToast(`📋 JSON ${jumlah} voucher (${zonk} zonk) disalin!`))
+      .catch(doFallbackCopy);
+  } else {
+    doFallbackCopy();
+  }
+}
+
+/* ============================================================
+   TABEL VOUCHER
+   ============================================================ */
+function renderVoucherTable() {
+  const tbody = document.getElementById("voucherTableBody");
+  const q = (document.getElementById("searchVoucher").value || "").toLowerCase();
+  const filter = document.getElementById("filterStatus").value;
+
+  const rows = [];
+  for (const hash in voucherDB) {
+    const v = voucherDB[hash];
+    let status, statusClass;
+    if (v.usedAt) { status = "Terpakai"; statusClass = "used"; }
+    else if (v.expiresAt && Date.now() > v.expiresAt) { status = "Kadaluarsa"; statusClass = "expired"; }
+    else { status = "Aktif"; statusClass = "active"; }
+
+    if (filter !== "all" && statusClass !== filter) continue;
+    if (q && !hash.includes(q) && !(v.tier || "").includes(q)) continue;
+    rows.push({ hash, ...v, status, statusClass });
+  }
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#666;padding:24px;">Tidak ada voucher</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(v => {
+    const exp = v.expiresAt ? new Date(v.expiresAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit" }) : "-";
+    const hadiah = v.prize === 0
+      ? '<span style="color:#ff5252;font-weight:900">💀 ZONK</span>'
+      : `<span style="color:#ffd700;font-weight:800">${v.prize} DM</span>`;
+    return `
+      <tr>
+        <td style="font-family:'Courier New',monospace;font-size:11px;color:#7b2ff7">${v.hash}</td>
+        <td><span class="badge ${v.tier || 'common'}">${v.tier || 'common'}</span></td>
+        <td>${hadiah}</td>
+        <td><span class="badge ${v.statusClass}">${v.status}</span></td>
+        <td style="font-size:11px;color:#a0a0b8">${exp}</td>
+        <td><button onclick="deleteVoucher('${v.hash}')" style="background:transparent;border:1px solid #ff1744;color:#ff5252;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer;">Hapus</button></td>
+      </tr>`;
+  }).join("");
+}
+
+function deleteVoucher(hash) {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa hapus!", true);
+    return;
+  }
+  if (!confirm("Hapus voucher ini?")) return;
+  delete voucherDB[hash];
+  saveDB();
+  renderVoucherTable();
+  renderStats();
+  showToast("🗑️ Voucher dihapus");
+}
+
+function renderLogs() {
+  const el = document.getElementById("logList");
+  if (historyLog.length === 0) {
+    el.innerHTML = '<div class="history-empty">Belum ada log spin.</div>';
+    return;
+  }
+  el.innerHTML = historyLog.map(h => {
+    const d = new Date(h.time);
+    const tgl = d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" });
+    const jam = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const isZonk = h.prize === 0;
+    const hasil = isZonk
+      ? '<span style="color:#ff5252;font-weight:900">💀 ZONK!</span>'
+      : `<span class="log-prize">${h.prize} DM</span>`;
+    return `
+      <div class="log-item ${isZonk ? 'zonk' : ''}">
+        <div class="log-time">🕐 ${tgl} • ${jam} • 📱 ${h.deviceId || "-"}</div>
+        <div>Hadiah: ${hasil} <span class="badge ${h.tier || 'common'}">${h.tier || 'common'}</span></div>
+      </div>`;
+  }).join("");
+}
+
+/* ============================================================
+   BACKUP
+   ============================================================ */
+function exportFullBackup() {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa backup!", true);
+    return;
+  }
+
+  const data = {
+    format: "ff-spin-admin-backup",
+    version: 3,
+    exportedAt: new Date().toISOString(),
+    adminDeviceId: adminDeviceId,
+    deviceId: myDeviceId,
+    voucherDB: voucherDB,
+    historyLog: historyLog
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `admin-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast("💾 Backup admin berhasil di-download!");
+}
+
+function importAdminBackup(ev) {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa import!", true);
+    ev.target.value = "";
+    return;
+  }
+
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.format !== "ff-spin-admin-backup") {
+        throw new Error("File bukan backup admin.");
+      }
+      if (!data.voucherDB) throw new Error("Data voucher kosong.");
+
+      const jmlV = Object.keys(data.voucherDB).length;
+      const jmlL = (data.historyLog || []).length;
+
+      if (!confirm(`⚠️ Import backup admin?\n\n- ${jmlV} voucher\n- ${jmlL} log\n\nData saat ini akan DITIMPA.`)) {
+        ev.target.value = "";
+        return;
+      }
+
+      voucherDB = data.voucherDB;
+      historyLog = data.historyLog || [];
+      saveDB();
+      saveHistory();
+      refreshAdmin();
+      renderHistory();
+      showToast(`✅ Import ${jmlV} voucher & ${jmlL} log berhasil!`);
+    } catch (err) {
+      showToast("❌ Gagal import: " + err.message, true);
+    }
+    ev.target.value = "";
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   RESET
+   ============================================================ */
+function resetAllData() {
+  if (adminDeviceId !== myDeviceId) {
+    showToast("🚫 Hanya admin aktif yang bisa reset!", true);
+    return;
+  }
+  if (!confirm("⚠️ HAPUS SEMUA DATA?")) return;
+  if (!confirm("⚠️ YAKIN? Tidak bisa dibatalkan!")) return;
+
+  voucherDB = {};
+  historyLog = [];
+  playerSaldo = [];
+  saveDB();
+  saveHistory();
+  saveSaldo();
+  refreshAdmin();
+  renderHistory();
+  updatePlayerUI();
+  showToast("🗑️ Semua data dihapus!");
+}
+
+function refreshAdmin() {
+  renderStats();
+  renderVoucherTable();
+  renderLogs();
+}
+
+/* ============================================================
+   PROTEKSI
+   ============================================================ */
+document.addEventListener("contextmenu", (e) => {
+  if (e.target.closest("input") || e.target.closest("textarea")) return;
+  e.preventDefault();
+});
+document.addEventListener("selectstart", (e) => {
+  if (e.target.closest("input") || e.target.closest("textarea")) return;
+  e.preventDefault();
+});
+document.addEventListener("dragstart", (e) => {
+  if (e.target.closest("input") || e.target.closest("textarea")) return;
+  e.preventDefault();
+});
+document.addEventListener("keydown", (e) => {
+  const key = e.key.toLowerCase();
+  if (e.target.closest("input") || e.target.closest("textarea")) return;
+
+  if (e.key === "PrintScreen") {
+    e.preventDefault();
+    triggerScreenshotWarning();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText("");
+    }
+    return false;
+  }
+  if (e.ctrlKey || e.metaKey) {
+    const blocked = ["c", "s", "p", "u", "a", "x"];
+    if (blocked.includes(key)) { e.preventDefault(); return false; }
+    if (e.shiftKey && ["i", "j", "c"].includes(key)) { e.preventDefault(); return false; }
+  }
+  if (e.key === "F12") { e.preventDefault(); return false; }
+});
+
+window.addEventListener("blur", () => {
+  isBlurred = true;
+  setTimeout(() => {
+    if (isBlurred && !document.getElementById("adminModal").classList.contains("open")) {
+      document.getElementById("blockerOverlay").classList.add("show");
+    }
+  }, 150);
+});
+window.addEventListener("focus", () => {
+  isBlurred = false;
+  document.getElementById("blockerOverlay").classList.remove("show");
+});
+
+let lastW = window.innerWidth, lastH = window.innerHeight;
+window.addEventListener("resize", () => {
+  const dw = Math.abs(window.innerWidth - lastW);
+  const dh = Math.abs(window.innerHeight - lastH);
+  if ((dw > 200 || dh > 200) && !document.getElementById("adminModal").classList.contains("open")) {
+    triggerScreenshotWarning();
+  }
+  lastW = window.innerWidth;
+  lastH = window.innerHeight;
+  buildWatermark();
+});
+
+function triggerScreenshotWarning() {
+  const warn = document.getElementById("screenshotWarn");
+  warn.classList.add("show");
+  setTimeout(() => warn.classList.remove("show"), 3000);
+
+  document.body.style.filter = "blur(20px)";
+  document.getElementById("blockerOverlay").classList.add("show");
+  setTimeout(() => {
+    if (!isBlurred) {
+      document.body.style.filter = "";
+      document.getElementById("blockerOverlay").classList.remove("show");
+    }
+  }, 1500);
+}
+
+setInterval(() => {
+  const wl = document.getElementById("watermarkLayer");
+  const mw = document.getElementById("mainWatermark");
+  if (!wl || !wl.parentNode || !mw || !mw.parentNode) location.reload();
+}, 2000);
+
+function buildWatermark() {
+  const deviceId = getDeviceId();
+  const tanggal = new Date().toLocaleDateString("id-ID");
+  const text = `SPIN FF • ${deviceId} • ${tanggal} • DO NOT COPY `;
+
+  const layer = document.getElementById("watermarkLayer");
+  let html = "";
+  for (let r = 0; r < 20; r++) {
+    for (let c = 0; c < 6; c++) html += `<span>${text}</span>`;
+    html += "<br>";
+  }
+  layer.innerHTML = html;
+
+  document.getElementById("mainWatermark").textContent = `${deviceId} • ${tanggal}`;
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function initApp() {
+  try {
+    loadDB();
+    buildWatermark();
+    renderWheelNumbers();
+    renderHistory();
+
+    const saldoValid = playerSaldo.filter(h => {
+      const v = voucherDB[h];
+      return v && !v.usedAt && (!v.expiresAt || Date.now() < v.expiresAt);
+    });
+
+    if (saldoValid.length > 0 || Object.keys(voucherDB).length > 0) {
+      document.getElementById("balanceCard").style.display = "flex";
+      document.getElementById("hintBox").style.display = "none";
+      document.getElementById("importSection").style.display = "none";
+    }
+    updatePlayerUI();
+  } catch (err) {
+    console.error("Init error:", err);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initApp();
+
+  // Event listener judul (tahan 30 detik)
+  const tapEl = document.getElementById("secretTap");
+  if (tapEl) {
+    tapEl.addEventListener("mousedown", startHold);
+    tapEl.addEventListener("mouseup", stopHold);
+    tapEl.addEventListener("mouseleave", stopHold);
+    tapEl.addEventListener("touchstart", startHold, { passive: false });
+    tapEl.addEventListener("touchend", stopHold);
+    tapEl.addEventListener("touchcancel", stopHold);
+    tapEl.addEventListener("contextmenu", (e) => e.preventDefault());
+    tapEl.addEventListener("selectstart", (e) => e.preventDefault());
+  }
+
+  setInterval(buildWatermark, 60000);
+});
+
+window.bukaAdminDarurat = function() {
+  const modal = document.getElementById("adminModal");
+  const login = document.getElementById("adminLogin");
+  const panel = document.getElementById("adminPanel");
+  const pass = document.getElementById("adminPassword");
+  const err = document.getElementById("loginErr");
+
+  if (!modal) return;
+  modal.classList.add("open");
+  if (login) login.style.display = "block";
+  if (panel) panel.style.display = "none";
+  if (pass) pass.value = "";
+  if (err) err.textContent = "⚠️ Bypass darurat aktif.";
+  setTimeout(() => { if (pass) pass.focus(); }, 100);
+};
+
+console.log("%c🎰 SPIN FF — FINAL MAX PRO", "color:#ffd700;font-size:18px;font-weight:bold");
+
+</script>
+
+</body>
+</html>
