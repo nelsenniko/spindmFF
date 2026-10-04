@@ -2045,15 +2045,48 @@ function gateBackToVoucher() { showVoucherPage(); }
 async function gatePasteFromClipboard() {
   const inp = document.getElementById("gateInput");
   if (!inp) return;
+
+  // 1. Coba Clipboard API modern (butuh HTTPS + gesture)
   if (navigator.clipboard && navigator.clipboard.readText) {
     try {
       const text = await navigator.clipboard.readText();
-      if (!text || !text.trim()) { showToast("❌ Clipboard kosong", true); return; }
-      inp.value = text.trim().toUpperCase();
-      showToast("✅ Berhasil paste! Ketuk CEK");
-    } catch (err) { showToast("⚠️ Tidak bisa akses. Paste manual ya.", true); }
-  } else { showToast("⚠️ Browser tidak support. Paste manual.", true); }
-}
+      if (text && text.trim()) {
+        inp.value = text.trim().toUpperCase();
+        showToast("✅ Berhasil paste!");
+        inp.focus();
+        return;
+      } else {
+        showToast("⚠️ Clipboard kosong", true);
+        return;
+      }
+    } catch (err) {
+      // Gagal, lanjut ke fallback
+    }
+  }
+
+  // 2. Fallback: focus ke textarea & instruksi manual
+  inp.focus();
+  inp.select();
+  
+  // Coba paste via execCommand (bisa jalan di beberapa browser lama)
+  try {
+    const ok = document.execCommand("paste");
+    if (ok) {
+      showToast("✅ Berhasil paste!");
+      return;
+    }
+  } catch (e) {}
+
+  // 3. Kalau semua gagal — kasih instruksi manual
+  showToast("📋 Tahan di kolom input → Paste", true);
+  
+  // Kasih highlight visual biar user tau harus tap apa
+  inp.style.transition = "box-shadow 0.3s";
+  inp.style.boxShadow = "0 0 0 4px rgba(0,212,255,0.4)";
+  setTimeout(() => {
+    inp.style.boxShadow = "";
+  }, 2000);
+     }
 
 /* ============================================================
    PARSER VOUCHER
